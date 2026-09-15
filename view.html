@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>자리바꿈 · 학생 화면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#ffffff;
+    --surface:#ffffff;
+    --desk:#fff6cf;
+    --desk-empty:#fffef8;
+    --ink:#5b4636;
+    --ink-dim:#a89484;
+    --accent:#fffdd0;
+    --accent-ink:#6b5a2a;
+    --point:#ffe066;
+    --point-ink:#5b4636;
+    --girl:#ff9dbb;
+    --girl-soft:#fff5f8;
+    --boy:#1f93d1;
+    --boy-soft:#eefbfe;
+    --border:#f5edc0;
+    --shadow: 0 3px 0 rgba(230,220,150,0.28), 0 10px 22px rgba(230,220,150,0.28);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#211f18; --surface:#2b2820; --desk:#3a3527; --desk-empty:#332f24;
+      --ink:#f2ece3; --ink-dim:#b9ab9c; --accent:#e6dca0; --accent-ink:#33290c;
+      --point:#ffdf7e; --point-ink:#3a2e10;
+      --girl:#ffabc9; --girl-soft:#40303a; --boy:#8ad4f0; --boy-soft:#233b48;
+      --border:#4a4430; --shadow: 0 3px 0 rgba(0,0,0,0.2), 0 10px 22px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#211f18; --surface:#2b2820; --desk:#3a3527; --desk-empty:#332f24;
+    --ink:#f2ece3; --ink-dim:#b9ab9c; --accent:#e6dca0; --accent-ink:#33290c;
+    --point:#ffdf7e; --point-ink:#3a2e10;
+    --girl:#ffabc9; --girl-soft:#40303a; --boy:#8ad4f0; --boy-soft:#233b48;
+    --border:#4a4430; --shadow: 0 3px 0 rgba(0,0,0,0.2), 0 10px 22px rgba(0,0,0,0.35);
+  }
+
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; margin:0; overflow:hidden; }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Jua','Noto Sans KR',sans-serif;
+    display:flex; flex-direction:column;
+  }
+  h1{ font-family:'Jua','Noto Sans KR',sans-serif; text-wrap:balance; margin:0; }
+
+  #app{ display:flex; flex-direction:column; flex:1; min-height:0; width:100%; }
+
+  .topbar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 22px; }
+  .title{ font-family:'Jua','Noto Sans KR',sans-serif; font-size:1.3rem; text-align:center; flex:1; }
+  .ghost-btn{
+    border:2px solid var(--border); background:var(--surface); color:var(--ink-dim);
+    border-radius:14px; padding:8px 16px; font-size:.82rem; cursor:pointer; white-space:nowrap;
+    font-family:'Noto Sans KR',sans-serif;
+  }
+  .ghost-btn:hover{ color:var(--ink); border-color:var(--accent); }
+
+  .stage{ flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px 20px; gap:12px; overflow:hidden; }
+
+  .blackboard{
+    flex:0 0 auto; background:var(--ink); color:#ffffff; box-shadow:none;
+    text-align:center; padding:9px; border-radius:16px; font-family:'Jua','Noto Sans KR',sans-serif;
+    font-size:1rem; letter-spacing:.6em; text-indent:.6em; width:100%; max-width:640px;
+  }
+  .grid-wrap{ flex:1; min-height:0; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .grid{ display:grid; gap:var(--seat-gap, 12px); }
+  .spacer{ width:var(--spacer-w, 24px); }
+  .seat{
+    position:relative; width:var(--seat-w, 104px); height:var(--seat-h, 85px);
+    border-radius:20px; border:3px solid var(--border);
+    background:var(--desk-empty); display:flex; align-items:center; justify-content:center;
+    padding:6px;
+  }
+  .seat-group{
+    font-family:'Noto Sans KR',sans-serif;
+    position:absolute; top:4px; left:50%; transform:translateX(-50%);
+    font-size:var(--badge-font, .68rem); color:var(--group-text, #3a2a1f); background:var(--group-color, var(--ink-dim)); border:none;
+    border-radius:10px; padding:1px 8px; white-space:nowrap; font-weight:700;
+  }
+  .seat.filled{ background:var(--desk); }
+  .seat.girl{ background:var(--girl-soft); border-color:color-mix(in srgb, var(--girl) 55%, var(--border)); }
+  .seat.girl .seat-name{ color:var(--girl); }
+  .seat.boy{ background:var(--boy-soft); border-color:color-mix(in srgb, var(--boy) 55%, var(--border)); }
+  .seat.boy .seat-name{ color:var(--boy); }
+  .seat.has-group{
+    border-width:8px; border-color:var(--group-color, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--group-color) 35%, transparent);
+  }
+  .seat-name{ font-size:var(--seat-font, 1.2rem); font-weight:700; text-align:center; word-break:keep-all; line-height:1.15; }
+  .seat.empty .seat-name{ color:var(--ink-dim); font-weight:400; font-size:calc(var(--seat-font, 1.2rem) * 0.8); }
+  .seat.pending{ background:var(--desk-empty) !important; border-color:var(--border) !important; box-shadow:none !important; }
+  .seat.pending .seat-name{ visibility:hidden; }
+  /* duration here (3.8s) must match CHAOS_DURATION_MS in the script below */
+  .seat.chaos{ animation: deskChaos 3.8s cubic-bezier(.45,.05,.4,1) forwards; position:relative; z-index:5; }
+  @keyframes deskChaos{
+    0%{   transform:translate(0,0) scale(1) rotate(0deg); }
+    18%{  transform:translate(var(--wp1-x,0px), var(--wp1-y,0px)) scale(.55) rotate(var(--spin,4deg)); }
+    38%{  transform:translate(var(--wp2-x,0px), var(--wp2-y,0px)) scale(.62) rotate(calc(var(--spin,4deg) * -1)); }
+    60%{  transform:translate(var(--wp3-x,0px), var(--wp3-y,0px)) scale(.5) rotate(var(--spin,4deg)); }
+    80%{  transform:translate(var(--wp1-x,0px), var(--wp1-y,0px)) scale(.6) rotate(calc(var(--spin,4deg) * -0.6)); }
+    100%{ transform:translate(var(--wp2-x,0px), var(--wp2-y,0px)) scale(.58) rotate(var(--spin,4deg)); }
+  }
+  /* duration here (.5s) must match SETTLE_MS in the script below; starts exactly
+     where deskChaos's 100% frame leaves off so there's no visual jump */
+  .seat.settle{ animation: deskSettle .5s cubic-bezier(.34,1.56,.64,1) forwards; position:relative; z-index:6; }
+  @keyframes deskSettle{
+    0%{   transform:translate(var(--wp2-x,0px), var(--wp2-y,0px)) scale(.58) rotate(var(--spin,4deg)); }
+    70%{  transform:translate(0,0) scale(1.1) rotate(0deg); }
+    100%{ transform:translate(0,0) scale(1) rotate(0deg); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .seat.chaos{ animation:none; }
+    .seat.settle{ animation:none; }
+  }
+
+  .reveal-btn{
+    flex:0 0 auto; border:none; background:var(--point); color:var(--point-ink);
+    padding:16px 34px; border-radius:20px; font-size:1.15rem; font-weight:400;
+    font-family:'Jua','Noto Sans KR',sans-serif; letter-spacing:.02em;
+    cursor:pointer; box-shadow:var(--shadow); transition:transform .1s ease;
+  }
+  .reveal-btn:hover{ transform:translateY(-2px); }
+
+  .empty-state{
+    text-align:center; color:var(--ink-dim); max-width:420px; margin:auto; font-size:.95rem; line-height:1.6;
+  }
+  .empty-state h1{ font-size:1.4rem; margin-bottom:12px; color:var(--ink); }
+
+  .groups-wrap{
+    display:flex; flex-wrap:wrap; gap:24px; justify-content:center; align-content:center;
+    width:fit-content; max-width:100%; margin:0 auto; transform-origin:center center;
+  }
+  .group-card{
+    background:var(--surface); border:2px solid var(--border); border-left:10px solid var(--group-color, var(--border));
+    border-radius:24px; padding:24px 30px; min-width:230px; box-shadow:var(--shadow);
+  }
+  .group-title{ font-family:'Jua','Noto Sans KR',sans-serif; font-size:1.7rem; margin-bottom:14px; }
+  .group-members{ display:flex; flex-wrap:wrap; gap:10px; max-width:340px; }
+  .member-chip{ border:2px solid var(--border); border-radius:16px; padding:7px 18px; font-size:1.2rem; font-weight:700; background:var(--desk-empty); }
+  .member-chip.girl{ color:var(--girl); border-color:color-mix(in srgb, var(--girl) 55%, var(--border)); background:var(--girl-soft); }
+  .member-chip.boy{ color:var(--boy); border-color:color-mix(in srgb, var(--boy) 55%, var(--border)); background:var(--boy-soft); }
+
+  footer{ font-family:'Noto Sans KR',sans-serif; flex:0 0 auto; text-align:center; font-size:.72rem; color:var(--ink-dim); padding:0 0 10px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+  var STORAGE_KEY = "jaribakkum_v1";
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        if(parsed && parsed.classes && parsed.classes.length) return parsed;
+      }
+    }catch(e){}
+    return null;
+  }
+
+  function currentClass(state){
+    if(!state) return null;
+    for(var i=0;i<state.classes.length;i++){
+      if(state.classes[i].id === state.currentClassId) return state.classes[i];
+    }
+    return state.classes[0] || null;
+  }
+
+  function studentById(cls, id){
+    var all = cls.girls.concat(cls.boys);
+    for(var i=0;i<all.length;i++) if(all[i].id === id) return all[i];
+    return null;
+  }
+
+  var GROUP_COLORS = ["#e0447f", "#d4a017", "#2f9e5c", "#3f6fd1", "#5e35b1"]; // 핑크,노랑,초록,파랑,보라 (모두 진하게)
+  var GROUP_TEXT_COLORS = ["#ffffff", "#3a2a1f", "#ffffff", "#ffffff", "#ffffff"]; // readable text per group color above
+  function groupColor(n){
+    return GROUP_COLORS[(n - 1) % GROUP_COLORS.length];
+  }
+  function groupTextColor(n){
+    return GROUP_TEXT_COLORS[(n - 1) % GROUP_TEXT_COLORS.length];
+  }
+
+  function el(tag, attrs, children){
+    var e = document.createElement(tag);
+    if(attrs) for(var k in attrs){
+      if(k==="class") e.className = attrs[k];
+      else if(k==="text") e.textContent = attrs[k];
+      else if(k.indexOf("on")===0) e.addEventListener(k.slice(2), attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    }
+    if(children) children.forEach(function(c){ if(c) e.appendChild(c); });
+    return e;
+  }
+
+  // must match the @keyframes deskChaos / deskSettle animation-durations in the CSS above
+  var CHAOS_DURATION_MS = 3800;
+  var SETTLE_MS = 500;
+  var SETTLE_STEP_MS = 90; // stagger between each desk settling into its own seat
+
+  // ---- reveal sound effects (Web Audio API, no external files needed) ----
+  var audioCtx = null;
+  function primeAudio(){
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      if(!audioCtx) audioCtx = new AC();
+      if(audioCtx.state === "suspended") audioCtx.resume();
+    }catch(e){}
+  }
+  function playTone(freq, duration, volume, type){
+    if(!audioCtx) return;
+    try{
+      var t0 = audioCtx.currentTime;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(volume, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.02);
+    }catch(e){}
+  }
+  var POP_SCALE = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50]; // C major-ish scale, xylophone feel
+  function playPopSound(i){
+    playTone(POP_SCALE[i % POP_SCALE.length], 0.22, 0.16, "triangle");
+  }
+  function playFinishSound(){
+    playTone(783.99, 0.35, 0.14, "triangle");
+    setTimeout(function(){ playTone(1046.50, 0.5, 0.16, "triangle"); }, 90);
+  }
+  function playSweepTone(freqFrom, freqTo, duration, volume){
+    if(!audioCtx) return;
+    try{
+      var t0 = audioCtx.currentTime;
+      var osc = audioCtx.createOscillator();
+      var filter = audioCtx.createBiquadFilter();
+      var gain = audioCtx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freqFrom, t0);
+      osc.frequency.exponentialRampToValueAtTime(freqTo, t0 + duration);
+      // lowpass sweep tracking the pitch turns the raw sawtooth into a soft "whoosh"
+      filter.type = "lowpass";
+      filter.Q.value = 2.5;
+      filter.frequency.setValueAtTime(freqFrom * 2.2, t0);
+      filter.frequency.exponentialRampToValueAtTime(freqTo * 2.2, t0 + duration);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(volume, t0 + duration * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.02);
+    }catch(e){}
+  }
+  // whoosh sweeps timed to line up with the desks' back-and-forth swings in
+  // @keyframes deskChaos (18/38/60/80/100% of the CHAOS_DURATION_MS animation)
+  function playGatherMotionSound(gen){
+    var stages = [
+      {delay:0,    from:260, to:720,  dur:0.8},
+      {delay:684,  from:720, to:220,  dur:0.9},
+      {delay:1444, from:300, to:820,  dur:0.85},
+      {delay:2280, from:820, to:340,  dur:0.9},
+      {delay:3040, from:360, to:960,  dur:0.75}
+    ];
+    stages.forEach(function(s){
+      setTimeout(function(){
+        if(gen !== revealGen) return;
+        playSweepTone(s.from, s.to, s.dur, 0.22);
+      }, s.delay);
+    });
+  }
+
+  function toggleFullscreen(){
+    if(document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen().catch(function(){});
+  }
+
+  function buildGrid(cls, pending, flip){
+    // build one row's column+aisle sequence, then (for a 180 flip) reverse both
+    // this sequence and the shared column-track template the same way, so the
+    // aisle gaps still land on the right tracks after mirroring
+    var rowTemplate = [];
+    var colTemplateParts = [];
+    for(var c=0;c<cls.cols;c++){
+      rowTemplate.push({type:"seat", col:c});
+      colTemplateParts.push("var(--seat-w, 90px)");
+      if(cls.pairMode && c%2===1 && c!==cls.cols-1){
+        rowTemplate.push({type:"spacer"});
+        colTemplateParts.push("var(--spacer-w, 24px)");
+      }
+    }
+    if(flip){
+      rowTemplate = rowTemplate.slice().reverse();
+      colTemplateParts = colTemplateParts.slice().reverse();
+    }
+
+    var grid = el("div", {class:"grid"});
+    grid.style.gridTemplateColumns = colTemplateParts.join(" ");
+
+    for(var rr=0; rr<cls.rows; rr++){
+      var r = flip ? (cls.rows-1-rr) : rr;
+      rowTemplate.forEach(function(item){
+        if(item.type === "spacer"){ grid.appendChild(el("div", {class:"spacer"})); return; }
+        var idx = r*cls.cols + item.col;
+        var occupantId = cls.seats[idx];
+        var occupant = occupantId ? studentById(cls, occupantId) : null;
+        var g = (!pending && cls.showGroups && occupant && occupant.groupNo) ? occupant.groupNo : 0;
+        var seatClasses = ["seat"];
+        if(occupant){ seatClasses.push("filled"); seatClasses.push(occupant.gender==="f"?"girl":"boy"); }
+        else seatClasses.push("empty");
+        if(pending) seatClasses.push("pending");
+        if(g) seatClasses.push("has-group");
+        var groupBadge = g ? el("span", {class:"seat-group", text:g+"모둠"}) : null;
+        var seatEl = el("div", {class:seatClasses.join(" ")}, [
+          groupBadge,
+          el("span", {class:"seat-name", text: occupant ? occupant.name : "빈자리"})
+        ]);
+        if(g){
+          seatEl.style.setProperty("--group-color", groupColor(g));
+          seatEl.style.setProperty("--group-text", groupTextColor(g));
+        }
+        grid.appendChild(seatEl);
+      });
+    }
+    return grid;
+  }
+
+  function buildGroupsView(cls){
+    var byGroup = {};
+    cls.girls.concat(cls.boys).forEach(function(s){
+      var g = s.groupNo || 0;
+      if(g > 0){ (byGroup[g] = byGroup[g] || []).push(s); }
+    });
+    var groupNumbers = Object.keys(byGroup).map(Number).sort(function(a,b){ return a-b; });
+
+    if(groupNumbers.length === 0){
+      return el("div", {class:"empty-state"}, [
+        el("h1", {text:"아직 지정된 모둠이 없어요"}),
+        el("p", {text:"선생님 화면에서 학생별로 모둠 번호를 입력해주세요."})
+      ]);
+    }
+
+    var wrap = el("div", {class:"groups-wrap"});
+    groupNumbers.forEach(function(g){
+      var card = el("div", {class:"group-card"});
+      card.style.setProperty("--group-color", groupColor(g));
+      var membersEl = el("div", {class:"group-members"});
+      byGroup[g].forEach(function(s){
+        membersEl.appendChild(el("span", {class:"member-chip "+(s.gender==="f"?"girl":"boy"), text:s.name}));
+      });
+      card.appendChild(el("div", {class:"group-title", text:g+"모둠"}));
+      card.appendChild(membersEl);
+      wrap.appendChild(card);
+    });
+    return wrap;
+  }
+
+  var revealGen = 0;
+
+  var FLIP_KEY = "jaribakkum_view_flip";
+  var flipped = false;
+  try{ flipped = localStorage.getItem(FLIP_KEY) === "1"; }catch(e){}
+
+  var VIEW_MODE_KEY = "jaribakkum_view_mode";
+  var viewMode = "seats";
+  try{ if(localStorage.getItem(VIEW_MODE_KEY) === "groups") viewMode = "groups"; }catch(e){}
+
+  function toggleFlip(){
+    flipped = !flipped;
+    try{ localStorage.setItem(FLIP_KEY, flipped ? "1" : "0"); }catch(e){}
+    var cls = currentClass(loadState());
+    if(!cls){ paintSeats(null, "plain"); return; }
+    paintSeats(cls, revealState.revealed ? "plain" : "waiting");
+  }
+
+  function toggleViewMode(){
+    viewMode = (viewMode === "groups") ? "seats" : "groups";
+    try{ localStorage.setItem(VIEW_MODE_KEY, viewMode); }catch(e){}
+    revealState = { key: undefined, revealed: true };
+    revealGen++; revealInProgress = false;
+    checkForUpdate();
+  }
+
+  function buildTopbar(cls){
+    var rightButtons = [
+      el("button", {class:"ghost-btn", text: viewMode==="groups" ? "🪑 자리 배치 보기" : "📋 모둠별 보기", onclick:toggleViewMode})
+    ];
+    if(viewMode === "seats"){
+      rightButtons.push(el("button", {class:"ghost-btn", text:"🔄 화면 방향 전환", onclick:toggleFlip}));
+    }
+    rightButtons.push(el("button", {class:"ghost-btn", text:"↻ 새로고침", onclick:checkForUpdate}));
+    return el("div", {class:"topbar"}, [
+      el("button", {class:"ghost-btn", text:"⛶ 전체화면", onclick:toggleFullscreen}),
+      el("div", {class:"title", text: cls ? cls.name : "자리바꿈"}),
+      el("div", {style:"display:flex;gap:8px;"}, rightButtons)
+    ]);
+  }
+
+  function paintGroups(cls){
+    var root = document.getElementById("app");
+    root.innerHTML = "";
+    var isGroupsWrap = !!cls;
+    var content = cls ? buildGroupsView(cls) : el("div", {class:"empty-state"}, [
+      el("h1", {text:"아직 자리 정보가 없어요"}),
+      el("p", {text:"선생님 화면에서 반과 학생을 먼저 설정해주세요."})
+    ]);
+    var stage = el("div", {class:"stage"}, [content]);
+    root.appendChild(buildTopbar(cls));
+    root.appendChild(stage);
+    root.appendChild(el("footer", {text:"이 화면은 결과만 보여줘요 · 모둠을 바꾸려면 선생님 화면을 이용하세요"}));
+
+    // content is only the actual groups-wrap when a class with groups exists —
+    // the "empty state" text block should stay at its natural (unscaled) size
+    if(isGroupsWrap && content.className === "groups-wrap"){
+      fitGroupsToScreen(stage, content);
+    }
+  }
+
+  // scales the whole groups-wrap up or down (via a single CSS transform) so the
+  // group cards fill as much of the available screen as possible either way,
+  // instead of always sitting at their small natural size
+  function fitGroupsToScreen(stageEl, wrapEl){
+    wrapEl.style.transform = "none";
+    var availW = stageEl.clientWidth;
+    var availH = stageEl.clientHeight;
+    if(availW <= 0 || availH <= 0) return;
+    var rect = wrapEl.getBoundingClientRect();
+    if(rect.width <= 0 || rect.height <= 0) return;
+    var scale = Math.min(availW / rect.width, availH / rect.height);
+    scale = Math.max(0.15, Math.min(scale, 4));
+    wrapEl.style.transform = "scale(" + scale + ")";
+  }
+
+  function fitSeatsToScreen(cls, gridWrapEl, gridEl){
+    var wrapW = gridWrapEl.clientWidth;
+    var wrapH = gridWrapEl.clientHeight;
+    if(wrapW <= 0 || wrapH <= 0) return;
+    var cols = cls.cols, rows = cls.rows;
+    var spacerCols = 0;
+    for(var c=0;c<cols;c++){ if(cls.pairMode && c%2===1 && c!==cols-1) spacerCols++; }
+    var GAP = 12;
+    var SPACER_W = 22;
+    var totalGaps = cols + spacerCols - 1;
+
+    var availW = wrapW - spacerCols*SPACER_W - Math.max(0,totalGaps)*GAP;
+    var rawSeatW = Math.max(1, availW / cols);
+
+    var rowGaps = Math.max(0, rows - 1);
+    var availH = wrapH - rowGaps*GAP;
+    var rawSeatH = Math.max(1, availH / rows);
+
+    // each axis only ever shrinks from its own hard limit, so the grid can never
+    // overflow its container — but we also keep cards from getting absurdly
+    // skinny/tall when one axis has much more room than the other
+    var seatW = Math.max(30, Math.min(rawSeatW, rawSeatH * 1.8));
+    var seatH = Math.max(26, Math.min(rawSeatH, rawSeatW * 1.6));
+
+    var fontSize = Math.max(13, Math.min(Math.min(seatW, seatH) * 0.26, 72));
+    var badgeFont = Math.max(10, fontSize * 0.4);
+
+    gridEl.style.setProperty("--seat-w", seatW + "px");
+    gridEl.style.setProperty("--seat-h", seatH + "px");
+    gridEl.style.setProperty("--seat-font", fontSize + "px");
+    gridEl.style.setProperty("--badge-font", badgeFont + "px");
+    gridEl.style.setProperty("--seat-gap", GAP + "px");
+    gridEl.style.setProperty("--spacer-w", SPACER_W + "px");
+  }
+
+  // mode: "plain" (final result, no button) | "waiting" (blank seats + reveal button) |
+  // "revealing" (names+groups already showing, desks visually shuffle then settle one by one)
+  function paintSeats(cls, mode){
+    var root = document.getElementById("app");
+    root.innerHTML = "";
+
+    var stageChildren;
+    var grid = null;
+    var gridWrap = null;
+    if(!cls){
+      stageChildren = [el("div", {class:"empty-state"}, [
+        el("h1", {text:"아직 자리 정보가 없어요"}),
+        el("p", {text:"선생님 화면(자리바꿈 편집 화면)에서 반과 학생을 먼저 설정해주세요. 같은 컴퓨터에서 열려 있으면 이 화면도 자동으로 채워져요."})
+      ])];
+    } else {
+      var blank = (mode === "waiting");
+      grid = buildGrid(cls, blank, flipped);
+      gridWrap = el("div", {class:"grid-wrap"}, [grid]);
+      var boardEl = el("div", {class:"blackboard", text:"칠 판"});
+      stageChildren = [];
+      if(!flipped){ stageChildren.push(boardEl); }
+      if(mode === "waiting"){
+        stageChildren.push(el("button", {class:"reveal-btn", text:"🎉 자리 결과 확인하기", onclick:onRevealClick}));
+      }
+      stageChildren.push(gridWrap);
+      if(flipped){ stageChildren.push(boardEl); }
+    }
+    var stage = el("div", {class:"stage"}, stageChildren);
+
+    root.appendChild(buildTopbar(cls));
+    root.appendChild(stage);
+    root.appendChild(el("footer", {text:"이 화면은 결과만 보여줘요 · 자리를 바꾸려면 선생님 화면을 이용하세요"}));
+
+    if(gridWrap && grid){ fitSeatsToScreen(cls, gridWrap, grid); }
+    if(grid && mode === "revealing") startGatherScatterThenReveal(cls, grid);
+  }
+
+  var revealInProgress = false;
+
+  // motion-graphic style: names and groups are already showing, but every desk
+  // swings inward toward the shared center, then out toward a couple of other
+  // seats (as if desks are being shuffled around the room) and back again —
+  // then, one by one in a shuffled order, each desk settles into its own true
+  // grid position (which it was in all along; only the visual flight changes)
+  function startGatherScatterThenReveal(cls, grid){
+    var gen = ++revealGen;
+    revealInProgress = true;
+    var seatEls = [].slice.call(grid.querySelectorAll(".seat"));
+    if(seatEls.length === 0){ revealInProgress = false; return; }
+
+    var rects = seatEls.map(function(el){ return el.getBoundingClientRect(); });
+    var centers = rects.map(function(r){ return {x:(r.left+r.right)/2, y:(r.top+r.bottom)/2}; });
+    var cx = centers.reduce(function(sum,c){ return sum + c.x; }, 0) / centers.length;
+    var cy = centers.reduce(function(sum,c){ return sum + c.y; }, 0) / centers.length;
+
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var n = seatEls.length;
+    function randomOtherIndex(self){
+      if(n <= 1) return self;
+      var j;
+      do { j = Math.floor(Math.random() * n); } while(j === self);
+      return j;
+    }
+
+    // amplify the raw distances so the swings are clearly visible even on a
+    // tightly-packed grid where seats sit close together
+    var AMP = 1.9;
+    seatEls.forEach(function(el, i){
+      var own = centers[i];
+      var t2 = centers[randomOtherIndex(i)];
+      var t3 = centers[randomOtherIndex(i)];
+      el.style.setProperty("--wp1-x", ((cx - own.x) * AMP) + "px");
+      el.style.setProperty("--wp1-y", ((cy - own.y) * AMP) + "px");
+      el.style.setProperty("--wp2-x", ((t2.x - own.x) * AMP) + "px");
+      el.style.setProperty("--wp2-y", ((t2.y - own.y) * AMP) + "px");
+      el.style.setProperty("--wp3-x", ((t3.x - own.x) * AMP) + "px");
+      el.style.setProperty("--wp3-y", ((t3.y - own.y) * AMP) + "px");
+      el.style.setProperty("--spin", ((Math.random() > 0.5 ? 1 : -1) * (5 + Math.random() * 6)) + "deg");
+      el.classList.add("chaos");
+    });
+
+    if(reduceMotion){
+      revealInProgress = false;
+      return;
+    }
+
+    playGatherMotionSound(gen);
+
+    // shuffle the settle order so desks don't just land row-by-row
+    var order = seatEls.map(function(_, i){ return i; });
+    for(var k = order.length - 1; k > 0; k--){
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = order[k]; order[k] = order[j]; order[j] = tmp;
+    }
+
+    setTimeout(function(){
+      if(gen !== revealGen) return;
+      order.forEach(function(seatIdx, orderPos){
+        setTimeout(function(){
+          if(gen !== revealGen) return;
+          var el = seatEls[seatIdx];
+          el.classList.remove("chaos");
+          el.classList.add("settle");
+          playPopSound(orderPos);
+          if(orderPos === order.length - 1){
+            setTimeout(function(){
+              if(gen !== revealGen) return;
+              revealInProgress = false;
+              playFinishSound();
+            }, SETTLE_MS);
+          }
+        }, orderPos * SETTLE_STEP_MS);
+      });
+    }, CHAOS_DURATION_MS);
+  }
+
+  // key: "<classId>|<revealToken>" identifies *which* arrangement is on screen;
+  // revealed: whether the button has been pressed for that arrangement yet
+  var revealState = { key: undefined, revealed: true };
+
+  function onRevealClick(){
+    var cls = currentClass(loadState());
+    if(!cls) return;
+    primeAudio();
+    revealState.revealed = true;
+    paintSeats(cls, "revealing");
+  }
+
+  function checkForUpdate(){
+    var state = loadState();
+    var cls = currentClass(state);
+
+    if(viewMode === "groups"){
+      paintGroups(cls);
+      return;
+    }
+
+    if(!cls){
+      revealState = { key: null, revealed: true };
+      revealGen++; revealInProgress = false;
+      paintSeats(null, "plain");
+      return;
+    }
+    var key = cls.id + "|" + (cls.revealToken || "");
+    if(key !== revealState.key){
+      var hasAnyone = cls.seats.some(function(id){ return !!id; });
+      revealState = { key: key, revealed: !hasAnyone };
+      revealGen++; revealInProgress = false;
+      paintSeats(cls, hasAnyone ? "waiting" : "plain");
+    } else if(!revealInProgress && revealState.revealed){
+      // already shown (or nothing to reveal) — keep reflecting live edits (manual moves, clear-all, etc.)
+      paintSeats(cls, "plain");
+    } else if(!revealInProgress){
+      // still waiting on the button for this arrangement — refresh the (still-hidden) data underneath
+      paintSeats(cls, "waiting");
+    }
+    // else: the reveal animation is actively playing — leave it uninterrupted (revealState.revealed
+    // is already set true the instant the button is clicked, so this check must come first or a
+    // poll landing mid-animation would wipe the in-progress grid)
+  }
+
+  window.addEventListener("storage", function(e){
+    if(!e.key || e.key === STORAGE_KEY) checkForUpdate();
+  });
+  document.addEventListener("visibilitychange", function(){
+    if(!document.hidden) checkForUpdate();
+  });
+  setInterval(checkForUpdate, 4000);
+
+  var resizeTimer = null;
+  window.addEventListener("resize", function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(checkForUpdate, 150);
+  });
+
+  checkForUpdate();
+})();
+</script>
+</body>
+</html>

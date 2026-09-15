@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>자리바꿈</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#ffffff;
+    --surface:#ffffff;
+    --surface-2:#fffbe8;
+    --desk:#fff6cf;
+    --desk-empty:#fffef8;
+    --ink:#5b4636;
+    --ink-dim:#a89484;
+    --accent:#fffdd0;
+    --accent-ink:#6b5a2a;
+    --accent-soft:#fffef0;
+    --point:#ffe066;
+    --point-ink:#5b4636;
+    --girl:#ff9dbb;
+    --girl-soft:#ffeaf1;
+    --boy:#1f93d1;
+    --boy-soft:#e4f7fc;
+    --border:#f5edc0;
+    --danger:#ff8a80;
+    --shadow: 0 3px 0 rgba(230,220,150,0.28), 0 10px 22px rgba(230,220,150,0.28);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#211f18;
+      --surface:#2b2820;
+      --surface-2:#332f24;
+      --desk:#3a3527;
+      --desk-empty:#332f24;
+      --ink:#f2ece3;
+      --ink-dim:#b9ab9c;
+      --accent:#e6dca0;
+      --accent-ink:#33290c;
+      --accent-soft:#3a3520;
+      --point:#ffdf7e;
+      --point-ink:#3a2e10;
+      --girl:#ffabc9;
+      --girl-soft:#4a2f42;
+      --boy:#8ad4f0;
+      --boy-soft:#1f3a4a;
+      --border:#4a4430;
+      --danger:#ff9188;
+      --shadow: 0 3px 0 rgba(0,0,0,0.2), 0 10px 22px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#211f18;
+    --surface:#2b2820;
+    --surface-2:#332f24;
+    --desk:#3a3527;
+    --desk-empty:#332f24;
+    --ink:#f2ece3;
+    --ink-dim:#b9ab9c;
+    --accent:#e6dca0;
+    --accent-ink:#33290c;
+    --accent-soft:#3a3520;
+    --point:#ffdf7e;
+    --point-ink:#3a2e10;
+    --girl:#ffabc9;
+    --girl-soft:#4a2f42;
+    --boy:#8ad4f0;
+    --boy-soft:#1f3a4a;
+    --border:#4a4430;
+    --danger:#ff9188;
+    --shadow: 0 3px 0 rgba(0,0,0,0.2), 0 10px 22px rgba(0,0,0,0.35);
+  }
+
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Jua','Noto Sans KR',sans-serif;
+    font-size:17px;
+    font-variant-numeric: tabular-nums;
+  }
+  h1,h2,h3{ font-family:'Jua','Noto Sans KR',sans-serif; text-wrap:balance; margin:0; }
+  button{ font-family:inherit; }
+  input[type=text], input[type=number]{ font-family:inherit; }
+
+  .app{ display:flex; flex-direction:column; min-height:100vh; }
+
+  /* ---------- header ---------- */
+  .board{
+    background:var(--ink);
+    color:#ffffff;
+    padding:18px 24px;
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  }
+  .board h1{ font-size:1.7rem; letter-spacing:.02em; margin-right:8px; color:#ffffff; }
+  .board .tagline{ font-family:'Noto Sans KR',sans-serif; font-size:.84rem; opacity:.85; margin-right:auto; color:#ffffff; }
+  .class-controls{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .class-controls select, .class-controls input[type=text]{
+    background:rgba(255,255,255,0.16); color:#ffffff;
+    border:1px solid rgba(255,255,255,0.4); border-radius:14px; padding:7px 10px; font-size:.9rem;
+  }
+  .class-controls select option{ color:#111; }
+  .class-controls input[type=text]{ width:9em; }
+  .icon-btn{
+    background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.4); color:#ffffff;
+    border-radius:14px; padding:7px 11px; font-size:.82rem; cursor:pointer;
+  }
+  .icon-btn:hover{ background:rgba(255,255,255,0.28); }
+
+  /* ---------- layout ---------- */
+  .layout{ display:flex; flex:1; gap:20px; padding:20px 24px; align-items:flex-start; }
+  .sidebar{
+    width:300px; flex:0 0 300px; display:flex; flex-direction:column; gap:10px;
+    position:sticky; top:20px; max-height:calc(100vh - 40px);
+  }
+  .sidebar-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:6px; flex:0 0 auto; }
+  .sidebar-tab{
+    min-width:0; font-family:'Noto Sans KR',sans-serif;
+    border:2px solid var(--border); background:var(--surface); color:var(--ink-dim);
+    border-radius:14px; padding:8px 6px; font-size:.78rem; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .sidebar-tab.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700; }
+  .sidebar-tab-content{
+    flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:16px;
+    padding-right:2px;
+  }
+  .stage{ flex:1; min-width:0; display:flex; flex-direction:column; gap:18px; }
+
+  .panel{
+    background:var(--surface); border:2px solid var(--border); border-radius:22px;
+    padding:16px; box-shadow:var(--shadow);
+  }
+  .panel h2{ font-size:1.2rem; margin-bottom:4px; }
+  .panel .hint{
+    font-family:'Noto Sans KR',sans-serif; font-size:.82rem; color:var(--ink-dim);
+    margin-bottom:10px; line-height:1.45;
+  }
+
+  .roster-cols{ display:flex; flex-direction:column; gap:14px; }
+  .roster-col h3{
+    font-family:'Noto Sans KR',sans-serif; font-size:.86rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.06em; color:var(--ink-dim); margin-bottom:6px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .roster-col.girls h3::before{ content:""; width:8px; height:8px; border-radius:50%; background:var(--girl); display:inline-block; }
+  .roster-col.boys h3::before{ content:""; width:8px; height:8px; border-radius:50%; background:var(--boy); display:inline-block; }
+  .roster-list{ list-style:none; margin:0 0 8px; padding:0; display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; }
+  .roster-list li{ display:flex; align-items:center; gap:6px; }
+  .roster-list input[type=text]{
+    flex:1; min-width:0; border:2px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:12px; padding:6px 8px; font-size:.95rem;
+  }
+  .roster-list input.roster-number-input{
+    font-family:'Noto Sans KR',sans-serif;
+    flex:0 0 42px; width:42px; min-width:0; border:2px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:12px; padding:6px 4px; font-size:.85rem; text-align:center;
+  }
+  .roster-list button{
+    border:none; background:transparent; color:var(--ink-dim); cursor:pointer; font-size:1rem; line-height:1;
+    padding:4px 6px; border-radius:10px;
+  }
+  .roster-list button:hover{ background:var(--surface-2); color:var(--danger); }
+  .add-student-btn{
+    width:100%; border:2px dashed var(--border); background:transparent; color:var(--ink-dim);
+    border-radius:14px; padding:7px; font-size:.82rem; cursor:pointer;
+  }
+  .add-student-btn:hover{ border-color:var(--accent); color:var(--accent); }
+
+  .saved-list{ list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
+  .saved-empty{ font-family:'Noto Sans KR',sans-serif; font-size:.82rem; color:var(--ink-dim); }
+  .saved-item{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    border:2px solid var(--border); background:var(--surface-2); border-radius:14px; padding:7px 9px;
+  }
+  .saved-info{ display:flex; flex-direction:column; min-width:0; }
+  .saved-name{ font-size:.95rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .saved-date{ font-family:'Noto Sans KR',sans-serif; font-size:.76rem; color:var(--ink-dim); }
+  .saved-actions{ display:flex; align-items:center; gap:4px; flex:0 0 auto; }
+  .saved-load{
+    font-family:'Noto Sans KR',sans-serif;
+    border:2px solid var(--border); background:var(--surface); color:var(--ink);
+    border-radius:12px; padding:5px 9px; font-size:.8rem; cursor:pointer; white-space:nowrap;
+  }
+  .saved-load:hover{ border-color:var(--accent); color:var(--accent); }
+  .saved-delete{
+    border:none; background:transparent; color:var(--ink-dim); cursor:pointer; font-size:1rem; line-height:1;
+    padding:4px 6px; border-radius:10px;
+  }
+  .saved-delete:hover{ background:var(--surface); color:var(--danger); }
+
+  .group-chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .group-chip{
+    font-family:'Noto Sans KR',sans-serif;
+    border:2px solid var(--group-color, var(--border)); background:var(--surface-2); color:var(--ink);
+    border-radius:20px; padding:5px 12px; font-size:.84rem; cursor:pointer; white-space:nowrap;
+  }
+  .group-chip.armed{ background:var(--group-color, var(--accent)); color:#fff; }
+  .group-chip.add{ border-style:dashed; border-color:var(--border); color:var(--ink-dim); }
+  .group-chip.add:hover{ border-color:var(--accent); color:var(--accent); }
+  .hint.armed-hint{ color:var(--accent); font-weight:700; }
+
+  .gender-arm-row{ display:flex; gap:8px; margin-bottom:8px; }
+  .gender-arm-btn{
+    font-family:'Noto Sans KR',sans-serif; flex:1;
+    border:2px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:14px; padding:7px; font-size:.88rem; cursor:pointer;
+    white-space:pre-line; word-break:keep-all; line-height:1.4; text-align:center;
+  }
+  .gender-arm-btn.f{ border-color:color-mix(in srgb, var(--girl) 45%, var(--border)); }
+  .gender-arm-btn.m{ border-color:color-mix(in srgb, var(--boy) 45%, var(--border)); }
+  .gender-arm-btn.f.armed{ background:var(--girl); border-color:var(--girl); color:#fff; }
+  .gender-arm-btn.m.armed{ background:var(--boy); border-color:var(--boy); color:#fff; }
+
+  .field-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; font-size:.95rem; }
+  .field-row input[type=number]{
+    width:64px; border:2px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:12px; padding:5px 7px; text-align:center; font-size:.95rem;
+  }
+  .switch-row{ display:flex; align-items:center; gap:8px; font-size:.95rem; margin-bottom:8px; }
+
+  .action-btn{
+    width:100%; border:2px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:16px; padding:10px; font-size:.98rem; cursor:pointer; margin-bottom:8px; text-align:left;
+    display:flex; align-items:center; gap:8px;
+  }
+  .action-btn:last-child{ margin-bottom:0; }
+  .action-btn:hover{ border-color:var(--accent); }
+  .action-btn.primary{ background:var(--point); color:var(--point-ink); border-color:var(--point); font-weight:700; justify-content:center; }
+  .action-btn.primary:hover{ opacity:.92; }
+  .action-btn.danger:hover{ border-color:var(--danger); color:var(--danger); }
+
+  /* ---------- stats ---------- */
+  .stats{ display:flex; gap:10px; }
+  .stat{
+    flex:1; background:var(--surface); border:2px solid var(--border); border-radius:18px;
+    padding:10px 14px; box-shadow:var(--shadow);
+  }
+  .stat .num{ font-size:1.6rem; font-weight:400; font-family:'Jua',sans-serif; }
+  .stat .label{ font-family:'Noto Sans KR',sans-serif; font-size:.78rem; color:var(--ink-dim); }
+  .stat.girl .num{ color:var(--girl); }
+  .stat.boy .num{ color:var(--boy); }
+  .stat.empty .num{ color:var(--ink-dim); }
+
+  /* ---------- classroom stage ---------- */
+  .classroom{
+    background:var(--surface); border:2px solid var(--border); border-radius:24px;
+    padding:20px; box-shadow:var(--shadow); overflow-x:auto;
+  }
+  .blackboard{
+    background:var(--ink); color:#ffffff; box-shadow:none;
+    text-align:center; padding:9px; border-radius:16px; font-family:'Jua',sans-serif;
+    font-size:.85rem; letter-spacing:.5em; text-indent:.5em; margin-bottom:18px;
+  }
+  .grid{ display:grid; gap:10px; min-width:max-content; }
+  .spacer{ width:22px; }
+  .seat{
+    position:relative; aspect-ratio:1/0.82; min-width:108px; border-radius:18px; border:2px solid var(--border);
+    background:var(--desk-empty); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; padding:8px 6px; transition:transform .08s ease, box-shadow .12s ease;
+  }
+  .seat:hover{ transform:translateY(-2px) scale(1.02); box-shadow:var(--shadow); }
+  .seat:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .seat .seat-no{ font-family:'Noto Sans KR',sans-serif; position:absolute; top:4px; left:6px; font-size:.7rem; color:var(--ink-dim); }
+  .seat .seat-name{ font-size:1.55rem; font-weight:700; text-align:center; word-break:keep-all; line-height:1.15; }
+  .seat.filled{ background:var(--desk); }
+  .seat.girl{ background:var(--girl-soft); border-color:color-mix(in srgb, var(--girl) 45%, var(--border)); }
+  .seat.girl .seat-name{ color:var(--girl); }
+  .seat.boy{ background:var(--boy-soft); border-color:color-mix(in srgb, var(--boy) 45%, var(--border)); }
+  .seat.boy .seat-name{ color:var(--boy); }
+  .seat.selected{ outline:2px solid var(--accent); outline-offset:2px; }
+  .seat.empty .seat-name{ color:var(--ink-dim); font-weight:400; font-size:1.1rem; }
+  .seat.locked{ box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent); }
+  .seat.has-group{ border-left: 4px solid var(--group-color, var(--border)); }
+  .seat.armed-member{ box-shadow: inset 0 0 0 3px var(--group-color, var(--accent)); }
+  .seat.gender-lock-f{ border-style:dashed; border-color:var(--girl); }
+  .seat.gender-lock-f.empty{ background:var(--girl-soft); }
+  .seat.gender-lock-m{ border-style:dashed; border-color:var(--boy); }
+  .seat.gender-lock-m.empty{ background:var(--boy-soft); }
+  .seat-group{
+    font-family:'Noto Sans KR',sans-serif;
+    position:absolute; top:3px; left:50%; transform:translateX(-50%);
+    font-size:.64rem; color:var(--ink-dim); background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:1px 6px; white-space:nowrap;
+  }
+  .seat-clear{
+    position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; border:none;
+    background:transparent; color:var(--ink-dim); font-size:.75rem; cursor:pointer; line-height:1;
+  }
+  .seat-clear:hover{ background:var(--surface); color:var(--danger); }
+  .seat-lock{
+    position:absolute; top:2px; right:20px; width:18px; height:18px; border-radius:50%; border:none;
+    background:transparent; color:var(--ink-dim); font-size:.68rem; cursor:pointer; line-height:1;
+    opacity:.55;
+  }
+  .seat-lock:hover{ background:var(--surface); opacity:1; }
+  .seat-lock.on{ opacity:1; }
+
+  .pool{ background:var(--surface); border:2px solid var(--border); border-radius:22px; padding:16px; box-shadow:var(--shadow); }
+  .pool h2{ font-size:1.1rem; margin-bottom:2px; }
+  .pool .hint{ font-family:'Noto Sans KR',sans-serif; font-size:.8rem; color:var(--ink-dim); margin-bottom:10px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; min-height:34px; }
+  .chip{
+    border:2px solid var(--border); background:var(--surface-2); border-radius:20px; padding:6px 13px;
+    font-size:.92rem; cursor:pointer; color:var(--ink);
+  }
+  .chip.girl{ border-color:color-mix(in srgb, var(--girl) 45%, var(--border)); background:var(--girl-soft); color:var(--girl); }
+  .chip.boy{ border-color:color-mix(in srgb, var(--boy) 45%, var(--border)); background:var(--boy-soft); color:var(--boy); }
+  .chip.selected{ outline:2px solid var(--accent); outline-offset:1px; }
+  .chip.armed-member{ box-shadow: inset 0 0 0 2px var(--accent); font-weight:700; }
+  .chips .none{ font-family:'Noto Sans KR',sans-serif; font-size:.82rem; color:var(--ink-dim); }
+
+  footer.meta{ font-family:'Noto Sans KR',sans-serif; text-align:center; font-size:.76rem; color:var(--ink-dim); padding:6px 0 20px; }
+
+  @media (max-width: 860px){
+    .layout{ flex-direction:column; padding:14px; }
+    .sidebar{ width:100%; flex:none; position:static; max-height:none; }
+    .sidebar-tab-content{ overflow-y:visible; }
+    .board{ padding:14px 16px; }
+  }
+
+  @media print{
+    body{ background:#fff; }
+    .board, .sidebar, .pool, footer.meta{ display:none !important; }
+    .layout{ padding:0; }
+    .stage{ gap:8px; }
+    .classroom{ box-shadow:none; border:none; }
+    .print-title{ display:block !important; text-align:center; font-size:1.2rem; margin-bottom:10px; }
+  }
+  .print-title{ display:none; }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+  var STORAGE_KEY = "jaribakkum_v1";
+
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+  function shuffle(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t=a[i]; a[i]=a[j]; a[j]=t;
+    }
+    return a;
+  }
+
+  function makeDefaultClass(name, girlCount, boyCount, cols, rows){
+    var girls=[], boys=[];
+    for(var i=1;i<=girlCount;i++) girls.push({id:uid(), name:"여학생"+i, gender:"f", groupNo:0, number:"", seatHistory:[]});
+    for(var j=1;j<=boyCount;j++) boys.push({id:uid(), name:"남학생"+j, gender:"m", groupNo:0, number:"", seatHistory:[]});
+    var seatCount = cols*rows;
+    var seats = new Array(seatCount).fill(null);
+    var lockedSeats = new Array(seatCount).fill(false);
+    var seatGenderLock = new Array(seatCount).fill(null);
+    return { id:uid(), name:name, cols:cols, rows:rows, pairMode:true, showGroups:true, girls:girls, boys:boys, seats:seats, lockedSeats:lockedSeats, seatGenderLock:seatGenderLock, savedLayouts:[], revealToken:null };
+  }
+
+  function chunkGroupSizes(n){
+    var sizes = [];
+    var remaining = n;
+    while(remaining > 0){
+      if(remaining === 5){ sizes.push(5); remaining = 0; }
+      else if(remaining <= 4){ sizes.push(remaining); remaining = 0; }
+      else { sizes.push(4); remaining -= 4; }
+    }
+    return sizes;
+  }
+
+  function computeGroupNumbers(cls){
+    var groupNo = new Array(cls.cols*cls.rows).fill(null);
+    var next = 1;
+    for(var c=0;c<cls.cols;c++){
+      var sizes = chunkGroupSizes(cls.rows);
+      var r = 0;
+      sizes.forEach(function(sz){
+        var num = next++;
+        for(var k=0;k<sz;k++){ groupNo[r*cls.cols+c] = num; r++; }
+      });
+    }
+    return groupNo;
+  }
+
+  var GROUP_COLORS = ["#e0447f", "#d4a017", "#2f9e5c", "#3f6fd1", "#5e35b1"]; // 핑크,노랑,초록,파랑,보라 (모두 진하게)
+  function groupColor(n){
+    return GROUP_COLORS[(n - 1) % GROUP_COLORS.length];
+  }
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        if(parsed && parsed.classes && parsed.classes.length) return parsed;
+      }
+    }catch(e){}
+    var grades = [{ label:"6학년", count:5 }, { label:"4학년", count:4 }];
+    var classes = [];
+    grades.forEach(function(g){
+      for(var i=1;i<=g.count;i++){
+        classes.push(makeDefaultClass(g.label+" "+i+"반", 10, 11, 7, 3));
+      }
+    });
+    return { currentClassId: classes[0].id, classes: classes };
+  }
+
+  var state = loadState();
+  var selected = null; // {kind:'seat', idx} | {kind:'pool', id}
+  var armedGroup = null; // when set, seat/pool clicks toggle group membership instead of selecting
+  var armedGender = null; // "f" | "m" | null — when set, seat clicks toggle a gender-only reservation instead of selecting
+  var sidebarTab = "roster"; // which sidebar tab is showing: "roster" | "layout" | "actions" | "saved"
+
+  function save(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  function currentClass(){
+    var c = null;
+    for(var i=0;i<state.classes.length;i++){
+      if(state.classes[i].id === state.currentClassId){ c = state.classes[i]; break; }
+    }
+    if(!c){ c = state.classes[0]; state.currentClassId = c.id; }
+    if(!c.savedLayouts) c.savedLayouts = [];
+    if(!c.lockedSeats) c.lockedSeats = new Array(c.seats.length).fill(false);
+    if(!c.seatGenderLock) c.seatGenderLock = new Array(c.seats.length).fill(null);
+    if(c.showGroups === undefined) c.showGroups = true;
+    c.girls.concat(c.boys).forEach(function(s){
+      if(s.groupNo === undefined) s.groupNo = 0;
+      if(s.number === undefined) s.number = "";
+      if(!s.seatHistory) s.seatHistory = [];
+    });
+    return c;
+  }
+
+  function toggleShowGroups(v){
+    var cls = currentClass();
+    cls.showGroups = v;
+    save(); render();
+  }
+
+  function allStudents(cls){
+    return cls.girls.concat(cls.boys);
+  }
+
+  function studentById(cls, id){
+    var all = allStudents(cls);
+    for(var i=0;i<all.length;i++) if(all[i].id === id) return all[i];
+    return null;
+  }
+
+  function unassignedStudents(cls){
+    var assigned = {};
+    for(var i=0;i<cls.seats.length;i++){ if(cls.seats[i]) assigned[cls.seats[i]]=true; }
+    var all = allStudents(cls);
+    var out = [];
+    for(var j=0;j<all.length;j++){ if(!assigned[all[j].id]) out.push(all[j]); }
+    return out;
+  }
+
+  function resizeSeats(cls){
+    var wanted = cls.cols*cls.rows;
+    var seats = cls.seats.slice(0, wanted);
+    while(seats.length < wanted) seats.push(null);
+    cls.seats = seats;
+    if(!cls.lockedSeats) cls.lockedSeats = [];
+    var locked = cls.lockedSeats.slice(0, wanted);
+    while(locked.length < wanted) locked.push(false);
+    cls.lockedSeats = locked;
+    if(!cls.seatGenderLock) cls.seatGenderLock = [];
+    var genderLock = cls.seatGenderLock.slice(0, wanted);
+    while(genderLock.length < wanted) genderLock.push(null);
+    cls.seatGenderLock = genderLock;
+  }
+
+  function computeGroups(seatIdxSet, cols, rows, pairMode){
+    var groups = [];
+    for(var r=0;r<rows;r++){
+      for(var c=0;c<cols;c+=(pairMode?2:1)){
+        var i1 = r*cols+c;
+        var i2 = (pairMode && c+1<cols) ? r*cols+c+1 : null;
+        var has1 = seatIdxSet.has(i1);
+        var has2 = i2!==null && seatIdxSet.has(i2);
+        if(has1 && has2) groups.push([i1,i2]);
+        else if(has1) groups.push([i1]);
+        else if(has2) groups.push([i2]);
+      }
+    }
+    return groups;
+  }
+
+  var SEAT_HISTORY_CAP = 3;
+
+  function buildForbiddenMap(cls){
+    var map = {};
+    allStudents(cls).forEach(function(s){
+      if(s.seatHistory && s.seatHistory.length){ map[s.id] = new Set(s.seatHistory); }
+    });
+    return map;
+  }
+
+  function recordSeatHistoryForSeats(cls, seatIndices){
+    seatIndices.forEach(function(idx){
+      var sid = cls.seats[idx];
+      if(!sid) return;
+      var s = studentById(cls, sid);
+      if(!s) return;
+      if(!s.seatHistory) s.seatHistory = [];
+      s.seatHistory.push(idx);
+      if(s.seatHistory.length > SEAT_HISTORY_CAP) s.seatHistory = s.seatHistory.slice(-SEAT_HISTORY_CAP);
+    });
+  }
+
+  // best-effort local search: swap students between seats within seatIdx until
+  // none of them sit in a seat that's in their own forbidden history (or a
+  // fixed number of passes is exhausted, whichever comes first)
+  function fixForbiddenSeats(cls, seatIdx, forbiddenMap){
+    if(seatIdx.length < 2) return;
+    for(var pass=0; pass<4; pass++){
+      var violations = seatIdx.filter(function(idx){
+        var sid = cls.seats[idx];
+        return sid && forbiddenMap[sid] && forbiddenMap[sid].has(idx);
+      });
+      if(violations.length === 0) return;
+      var progressed = false;
+      violations.forEach(function(idx){
+        var sid = cls.seats[idx];
+        if(!(sid && forbiddenMap[sid] && forbiddenMap[sid].has(idx))) return; // already fixed this pass
+        var others = shuffle(seatIdx.filter(function(o){ return o !== idx; }));
+        for(var ci=0; ci<others.length; ci++){
+          var pIdx = others[ci];
+          var pSid = cls.seats[pIdx];
+          var sidBadAtP = forbiddenMap[sid] && forbiddenMap[sid].has(pIdx);
+          var pSidBadAtIdx = pSid && forbiddenMap[pSid] && forbiddenMap[pSid].has(idx);
+          if(!sidBadAtP && !pSidBadAtIdx){
+            cls.seats[idx] = pSid;
+            cls.seats[pIdx] = sid;
+            progressed = true;
+            break;
+          }
+        }
+      });
+      if(!progressed) return; // can't improve further — accept the remaining (rare) violations
+    }
+  }
+
+  function randomAssign(mode, alternate){
+    var cls = currentClass();
+    var forbiddenMap = buildForbiddenMap(cls);
+    var lockedIdx = {};
+    var lockedStudentIds = {};
+    for(var lp=0;lp<cls.seats.length;lp++){
+      if(cls.lockedSeats[lp]){
+        lockedIdx[lp] = true;
+        if(cls.seats[lp]) lockedStudentIds[cls.seats[lp]] = true;
+      }
+    }
+    var seatIdx;
+    var pool;
+    if(mode === "all"){
+      seatIdx = [];
+      for(var i=0;i<cls.seats.length;i++) if(!lockedIdx[i]) seatIdx.push(i);
+      pool = allStudents(cls).filter(function(s){ return !lockedStudentIds[s.id]; });
+      for(var z=0;z<cls.seats.length;z++){ if(!lockedIdx[z]) cls.seats[z] = null; }
+    } else {
+      seatIdx = [];
+      for(var k=0;k<cls.seats.length;k++) if(cls.seats[k]===null && !lockedIdx[k]) seatIdx.push(k);
+      pool = unassignedStudents(cls).filter(function(s){ return !lockedStudentIds[s.id]; });
+    }
+
+    var didAssign = false;
+
+    // seats reserved for a specific gender are filled first, from that gender's own pool
+    var girlLockSeats = seatIdx.filter(function(idx){ return cls.seatGenderLock[idx] === "f"; });
+    var boyLockSeats = seatIdx.filter(function(idx){ return cls.seatGenderLock[idx] === "m"; });
+    var freeSeats = seatIdx.filter(function(idx){ return !cls.seatGenderLock[idx]; });
+
+    if(girlLockSeats.length || boyLockSeats.length){
+      var girlsForLocks = shuffle(pool.filter(function(s){ return s.gender === "f"; }));
+      var boysForLocks = shuffle(pool.filter(function(s){ return s.gender === "m"; }));
+      girlLockSeats.forEach(function(idx){ if(girlsForLocks.length){ cls.seats[idx] = girlsForLocks.pop().id; didAssign = true; } });
+      boyLockSeats.forEach(function(idx){ if(boysForLocks.length){ cls.seats[idx] = boysForLocks.pop().id; didAssign = true; } });
+      fixForbiddenSeats(cls, girlLockSeats, forbiddenMap);
+      fixForbiddenSeats(cls, boyLockSeats, forbiddenMap);
+      var placedIds = {};
+      girlLockSeats.concat(boyLockSeats).forEach(function(idx){ if(cls.seats[idx]) placedIds[cls.seats[idx]] = true; });
+      pool = pool.filter(function(s){ return !placedIds[s.id]; });
+    }
+    seatIdx = freeSeats;
+
+    if(seatIdx.length === 0 || pool.length === 0){
+      if(!didAssign){ render(); return; }
+      recordSeatHistoryForSeats(cls, girlLockSeats.concat(boyLockSeats));
+      cls.revealToken = uid();
+      save(); render();
+      return;
+    }
+    didAssign = true;
+
+    if(alternate){
+      var seatSet = new Set(seatIdx);
+      var groups = computeGroups(seatSet, cls.cols, cls.rows, cls.pairMode);
+      var girlsQ = shuffle(pool.filter(function(s){return s.gender==="f";}));
+      var boysQ = shuffle(pool.filter(function(s){return s.gender==="m";}));
+      groups.forEach(function(g){
+        if(g.length === 2){
+          var a=null,b=null;
+          if(girlsQ.length>0 && boysQ.length>0){ a=girlsQ.pop(); b=boysQ.pop(); }
+          else if(girlsQ.length>=2){ a=girlsQ.pop(); b=girlsQ.pop(); }
+          else if(boysQ.length>=2){ a=boysQ.pop(); b=boysQ.pop(); }
+          else if(girlsQ.length===1 && boysQ.length===0){ a=girlsQ.pop(); }
+          else if(boysQ.length===1 && girlsQ.length===0){ a=boysQ.pop(); }
+          var seatsShuffled = shuffle(g);
+          if(a) cls.seats[seatsShuffled[0]] = a.id;
+          if(b) cls.seats[seatsShuffled[1]] = b.id;
+        } else {
+          var pick = null;
+          if(girlsQ.length > boysQ.length) pick = girlsQ.pop();
+          else if(boysQ.length > 0) pick = boysQ.pop();
+          else if(girlsQ.length > 0) pick = girlsQ.pop();
+          if(pick) cls.seats[g[0]] = pick.id;
+        }
+      });
+    } else {
+      var shuffledPool = shuffle(pool);
+      for(var n=0;n<seatIdx.length && n<shuffledPool.length;n++){
+        cls.seats[seatIdx[n]] = shuffledPool[n].id;
+      }
+    }
+    fixForbiddenSeats(cls, seatIdx, forbiddenMap);
+    recordSeatHistoryForSeats(cls, girlLockSeats.concat(boyLockSeats, seatIdx));
+    cls.revealToken = uid();
+    save(); render();
+  }
+
+  function unlockAllSeats(){
+    var cls = currentClass();
+    cls.lockedSeats = new Array(cls.seats.length).fill(false);
+    save(); render();
+  }
+
+  function clearAllSeats(){
+    var cls = currentClass();
+    cls.seats = new Array(cls.seats.length).fill(null);
+    cls.lockedSeats = new Array(cls.seats.length).fill(false);
+    selected = null;
+    save(); render();
+  }
+
+  function onSeatClick(idx){
+    var cls = currentClass();
+    if(armedGroup !== null){
+      var sid = cls.seats[idx];
+      if(!sid) return;
+      var s = studentById(cls, sid);
+      if(s){ s.groupNo = (s.groupNo === armedGroup) ? 0 : armedGroup; save(); render(); }
+      return;
+    }
+    if(armedGender !== null){
+      cls.seatGenderLock[idx] = (cls.seatGenderLock[idx] === armedGender) ? null : armedGender;
+      save(); render();
+      return;
+    }
+    if(selected === null){
+      if(cls.seats[idx] !== null){ selected = {kind:"seat", idx:idx}; }
+    } else if(selected.kind === "pool"){
+      var occupant = cls.seats[idx];
+      cls.seats[idx] = selected.id;
+      selected = null;
+    } else if(selected.kind === "seat"){
+      if(selected.idx === idx){ selected = null; }
+      else{
+        var tmp = cls.seats[idx];
+        cls.seats[idx] = cls.seats[selected.idx];
+        cls.seats[selected.idx] = tmp;
+        selected = null;
+      }
+    }
+    save(); render();
+  }
+
+  function onSeatClear(idx, ev){
+    ev.stopPropagation();
+    var cls = currentClass();
+    cls.seats[idx] = null;
+    if(selected && selected.kind==="seat" && selected.idx===idx) selected = null;
+    save(); render();
+  }
+
+  function onSeatLockToggle(idx, ev){
+    ev.stopPropagation();
+    var cls = currentClass();
+    cls.lockedSeats[idx] = !cls.lockedSeats[idx];
+    save(); render();
+  }
+
+  function onPoolChipClick(id){
+    if(armedGroup !== null){
+      var cls = currentClass();
+      var s = studentById(cls, id);
+      if(s){ s.groupNo = (s.groupNo === armedGroup) ? 0 : armedGroup; save(); render(); }
+      return;
+    }
+    if(selected && selected.kind==="pool" && selected.id===id){ selected = null; }
+    else{ selected = {kind:"pool", id:id}; }
+    render();
+  }
+
+  function toggleArmGroup(n){
+    armedGroup = (armedGroup === n) ? null : n;
+    armedGender = null;
+    selected = null;
+    render();
+  }
+
+  function addNewGroup(){
+    var cls = currentClass();
+    var existing = cls.girls.concat(cls.boys).map(function(s){ return s.groupNo || 0; });
+    var next = 1;
+    existing.forEach(function(g){ if(g >= next) next = g+1; });
+    armedGroup = next;
+    armedGender = null;
+    selected = null;
+    render();
+  }
+
+  function toggleArmGender(g){
+    armedGender = (armedGender === g) ? null : g;
+    armedGroup = null;
+    selected = null;
+    render();
+  }
+
+  function clearAllGenderLocks(){
+    var cls = currentClass();
+    cls.seatGenderLock = new Array(cls.seats.length).fill(null);
+    save(); render();
+  }
+
+  function addStudent(gender){
+    var cls = currentClass();
+    var list = gender==="f" ? cls.girls : cls.boys;
+    var label = gender==="f" ? "여학생" : "남학생";
+    list.push({id:uid(), name:label+(list.length+1), gender:gender, groupNo:0, number:"", seatHistory:[]});
+    save(); render();
+  }
+
+  function removeStudent(gender, id){
+    var cls = currentClass();
+    var list = gender==="f" ? cls.girls : cls.boys;
+    var idx = list.findIndex(function(s){return s.id===id;});
+    if(idx>-1) list.splice(idx,1);
+    for(var i=0;i<cls.seats.length;i++){ if(cls.seats[i]===id) cls.seats[i]=null; }
+    if(selected && ((selected.kind==="pool" && selected.id===id))) selected = null;
+    save(); render();
+  }
+
+  function renameStudent(gender, id, name){
+    var cls = currentClass();
+    var list = gender==="f" ? cls.girls : cls.boys;
+    var s = list.find(function(x){return x.id===id;});
+    if(s) s.name = name;
+    save();
+  }
+
+  function setStudentNumber(gender, id, value){
+    var cls = currentClass();
+    var list = gender==="f" ? cls.girls : cls.boys;
+    var s = list.find(function(x){return x.id===id;});
+    if(s) s.number = value.trim().slice(0, 6);
+    save();
+  }
+
+  function autoFillGroupsFromSeats(){
+    var cls = currentClass();
+    var groupNo = computeGroupNumbers(cls);
+    for(var idx=0; idx<cls.seats.length; idx++){
+      var sid = cls.seats[idx];
+      if(!sid) continue;
+      var s = studentById(cls, sid);
+      if(s) s.groupNo = groupNo[idx];
+    }
+    save(); render();
+  }
+
+  function clearAllGroups(){
+    var cls = currentClass();
+    if(!confirm("모든 학생의 모둠 지정을 초기화할까요?")) return;
+    cls.girls.concat(cls.boys).forEach(function(s){ s.groupNo = 0; });
+    save(); render();
+  }
+
+  function updateGrid(field, value){
+    var cls = currentClass();
+    var v = Math.max(1, Math.min(20, parseInt(value,10) || 1));
+    cls[field] = v;
+    resizeSeats(cls);
+    selected = null;
+    save(); render();
+  }
+
+  function togglePairMode(v){
+    var cls = currentClass();
+    cls.pairMode = v;
+    save(); render();
+  }
+
+  function addClass(){
+    var cur = currentClass();
+    var c = makeDefaultClass("새 반", cur.girls.length, cur.boys.length, cur.cols, cur.rows);
+    state.classes.push(c);
+    state.currentClassId = c.id;
+    selected = null;
+    armedGroup = null;
+    armedGender = null;
+    save(); render();
+  }
+
+  function deleteClass(){
+    if(state.classes.length <= 1) return;
+    if(!confirm("현재 반의 자리 배치와 명단을 삭제할까요? 되돌릴 수 없어요.")) return;
+    var idx = state.classes.findIndex(function(c){return c.id===state.currentClassId;});
+    state.classes.splice(idx,1);
+    state.currentClassId = state.classes[0].id;
+    selected = null;
+    armedGroup = null;
+    armedGender = null;
+    save(); render();
+  }
+
+  function formatSavedAt(ts){
+    var d = new Date(ts);
+    function pad(n){ return (n<10?"0":"")+n; }
+    return pad(d.getMonth()+1)+"/"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes());
+  }
+
+  function saveLayout(){
+    var cls = currentClass();
+    var suggested = formatSavedAt(Date.now())+" 자리";
+    var name = window.prompt("저장할 이름을 입력하세요", suggested);
+    if(name === null) return;
+    name = name.trim() || suggested;
+    cls.savedLayouts.unshift({
+      id: uid(),
+      name: name,
+      savedAt: Date.now(),
+      cols: cls.cols,
+      rows: cls.rows,
+      pairMode: cls.pairMode,
+      seats: cls.seats.slice()
+    });
+    save(); render();
+  }
+
+  function loadLayout(layoutId){
+    var cls = currentClass();
+    var layout = cls.savedLayouts.find(function(l){ return l.id === layoutId; });
+    if(!layout) return;
+    if(!confirm('"'+layout.name+'" 배치를 불러올까요? 지금 화면의 자리 배치는 덮어써져요.')) return;
+    cls.cols = layout.cols;
+    cls.rows = layout.rows;
+    cls.pairMode = layout.pairMode;
+    resizeSeats(cls);
+    var validIds = {};
+    allStudents(cls).forEach(function(s){ validIds[s.id] = true; });
+    var restored = layout.seats.map(function(sid){ return (sid && validIds[sid]) ? sid : null; });
+    for(var i=0;i<cls.seats.length;i++){ cls.seats[i] = restored[i] || null; }
+    cls.lockedSeats = new Array(cls.seats.length).fill(false);
+    var occupiedIdx = [];
+    for(var oi=0;oi<cls.seats.length;oi++){ if(cls.seats[oi]) occupiedIdx.push(oi); }
+    recordSeatHistoryForSeats(cls, occupiedIdx);
+    selected = null;
+    save(); render();
+  }
+
+  function deleteLayout(layoutId){
+    var cls = currentClass();
+    if(!confirm("저장된 배치를 삭제할까요?")) return;
+    cls.savedLayouts = cls.savedLayouts.filter(function(l){ return l.id !== layoutId; });
+    save(); render();
+  }
+
+  function switchClass(id){
+    state.currentClassId = id;
+    selected = null;
+    armedGroup = null;
+    armedGender = null;
+    save(); render();
+  }
+
+  function renameClass(name){
+    currentClass().name = name;
+    save();
+  }
+
+  function doPrint(){ window.print(); }
+
+  function openStudentView(){
+    window.open("view.html", "jaribakkum_student_view");
+  }
+
+  function el(tag, attrs, children){
+    var e = document.createElement(tag);
+    if(attrs) for(var k in attrs){
+      if(k==="class") e.className = attrs[k];
+      else if(k==="text") e.textContent = attrs[k];
+      else if(k.indexOf("on")===0) e.addEventListener(k.slice(2), attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    }
+    if(children) children.forEach(function(c){ if(c) e.appendChild(c); });
+    return e;
+  }
+
+  function buildGrid(cls){
+    var colTemplateParts = [];
+    for(var c=0;c<cls.cols;c++){
+      colTemplateParts.push("minmax(104px,1fr)");
+      if(cls.pairMode && c%2===1 && c!==cls.cols-1) colTemplateParts.push("22px");
+    }
+    var grid = el("div", {class:"grid"});
+    grid.style.gridTemplateColumns = colTemplateParts.join(" ");
+
+    for(var r=0;r<cls.rows;r++){
+      for(var col=0; col<cls.cols; col++){
+        var idx = r*cls.cols + col;
+        var occupantId = cls.seats[idx];
+        var occupant = occupantId ? studentById(cls, occupantId) : null;
+        var isLocked = !!cls.lockedSeats[idx];
+        var showGroupNow = cls.showGroups || armedGroup !== null;
+        var g = (showGroupNow && occupant && occupant.groupNo) ? occupant.groupNo : 0;
+        var seatClasses = ["seat"];
+        if(occupant){ seatClasses.push("filled"); seatClasses.push(occupant.gender==="f"?"girl":"boy"); }
+        else seatClasses.push("empty");
+        if(selected && selected.kind==="seat" && selected.idx===idx) seatClasses.push("selected");
+        if(isLocked) seatClasses.push("locked");
+        if(g) seatClasses.push("has-group");
+        if(armedGroup !== null && occupant && occupant.groupNo === armedGroup) seatClasses.push("armed-member");
+        if(cls.seatGenderLock[idx] === "f") seatClasses.push("gender-lock-f");
+        else if(cls.seatGenderLock[idx] === "m") seatClasses.push("gender-lock-m");
+
+        var clearBtn = occupant ? el("button", {class:"seat-clear", text:"×", "aria-label":"자리 비우기", onclick:function(i){ return function(ev){ onSeatClear(i, ev); }; }(idx)}) : null;
+        var lockBtn = el("button", {
+          class: "seat-lock" + (isLocked ? " on" : ""),
+          text: isLocked ? "🔒" : "🔓",
+          "aria-label": isLocked ? "고정 해제" : "이 자리에 고정",
+          title: isLocked ? "랜덤 배치에서 제외됨 (눌러서 해제)" : (occupant ? "눌러서 랜덤 배치에서 제외" : "눌러서 이 자리를 계속 비워두기"),
+          onclick: function(i){ return function(ev){ onSeatLockToggle(i, ev); }; }(idx)
+        });
+        var groupBadge = g ? el("span", {class:"seat-group", text:g+"모둠"}) : null;
+        var seatEl = el("button", {
+          class: seatClasses.join(" "),
+          type:"button",
+          onclick: function(i){ return function(){ onSeatClick(i); }; }(idx)
+        }, [
+          el("span", {class:"seat-no", text:String(idx+1)}),
+          groupBadge,
+          el("span", {class:"seat-name", text: occupant ? occupant.name : "빈자리"}),
+          lockBtn,
+          clearBtn
+        ]);
+        if(g) seatEl.style.setProperty("--group-color", groupColor(g));
+        grid.appendChild(seatEl);
+        if(cls.pairMode && col%2===1 && col!==cls.cols-1){
+          grid.appendChild(el("div", {class:"spacer"}));
+        }
+      }
+    }
+    return grid;
+  }
+
+  function render(){
+    var cls = currentClass();
+    resizeSeats(cls);
+    var root = document.getElementById("app");
+    root.innerHTML = "";
+
+    // ---- header ----
+    var classSelect = el("select", {onchange:function(e){ switchClass(e.target.value); }});
+    state.classes.forEach(function(c){
+      var opt = el("option", {value:c.id, text:c.name});
+      if(c.id === cls.id) opt.selected = true;
+      classSelect.appendChild(opt);
+    });
+    var nameInput = el("input", {type:"text", value:"", oninput:function(e){ renameClass(e.target.value); }});
+    nameInput.value = cls.name;
+
+    var header = el("header", {class:"board"}, [
+      el("h1", {text:"자리바꿈"}),
+      el("span", {class:"tagline", text:"초등학교 학급 자리 배치 도구"}),
+      el("div", {class:"class-controls"}, [
+        classSelect,
+        nameInput,
+        el("button", {class:"icon-btn", text:"+ 새 반", onclick:addClass}),
+        el("button", {class:"icon-btn", text:"반 삭제", onclick:deleteClass})
+      ])
+    ]);
+
+    // ---- sidebar: roster ----
+    function rosterCol(gender, list, label){
+      var ul = el("ul", {class:"roster-list"});
+      list.forEach(function(s){
+        var numberInput = el("input", {type:"text", inputmode:"numeric", class:"roster-number-input", title:"출석 번호"});
+        numberInput.value = s.number || "";
+        numberInput.placeholder = "번호";
+        numberInput.addEventListener("change", function(e){ setStudentNumber(gender, s.id, e.target.value); });
+        var input = el("input", {type:"text", value:""});
+        input.value = s.name;
+        input.addEventListener("input", function(e){ renameStudent(gender, s.id, e.target.value); });
+        var removeBtn = el("button", {text:"×", onclick:function(){ removeStudent(gender, s.id); }});
+        ul.appendChild(el("li", {}, [numberInput, input, removeBtn]));
+      });
+      var addBtn = el("button", {class:"add-student-btn", text:"+ "+label+" 추가", onclick:function(){ addStudent(gender); }});
+      return el("div", {class:"roster-col "+(gender==="f"?"girls":"boys")}, [
+        el("h3", {text:label+" ("+list.length+")"}),
+        ul, addBtn
+      ]);
+    }
+
+    var rosterPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"학생 명단"}),
+      el("p", {class:"hint", text:"이름을 눌러 바로 수정하세요. 앞 칸에는 출석 번호를 입력할 수 있어요. 예시 이름은 자유롭게 실제 학생 이름으로 바꿀 수 있어요."}),
+      el("div", {class:"roster-cols"}, [
+        rosterCol("f", cls.girls, "여학생"),
+        rosterCol("m", cls.boys, "남학생")
+      ])
+    ]);
+
+    var colsInput = el("input", {type:"number", min:"1", max:"20"});
+    colsInput.value = cls.cols;
+    colsInput.addEventListener("change", function(e){ updateGrid("cols", e.target.value); });
+    var rowsInput = el("input", {type:"number", min:"1", max:"20"});
+    rowsInput.value = cls.rows;
+    rowsInput.addEventListener("change", function(e){ updateGrid("rows", e.target.value); });
+    var pairCheck = el("input", {type:"checkbox"});
+    pairCheck.checked = cls.pairMode;
+    pairCheck.addEventListener("change", function(e){ togglePairMode(e.target.checked); });
+
+    var layoutPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"교실 배치"}),
+      el("p", {class:"hint", text:"칠판을 바라보는 방향 기준, 첫 행이 맨 앞줄이에요."}),
+      el("div", {class:"field-row"}, [el("span",{text:"가로 (열, 책상 수)"}), colsInput]),
+      el("div", {class:"field-row"}, [el("span",{text:"세로 (행)"}), rowsInput]),
+      el("label", {class:"switch-row"}, [pairCheck, el("span",{text:"2인 1조(짝) 책상 배치"})])
+    ]);
+
+    var groupCheck = el("input", {type:"checkbox"});
+    groupCheck.checked = cls.showGroups;
+    groupCheck.addEventListener("change", function(e){ toggleShowGroups(e.target.checked); });
+
+    var groupCounts = {};
+    allStudents(cls).forEach(function(s){ var g=s.groupNo||0; if(g>0) groupCounts[g] = (groupCounts[g]||0)+1; });
+    if(armedGroup !== null && !(armedGroup in groupCounts)) groupCounts[armedGroup] = 0;
+    var groupNums = Object.keys(groupCounts).map(Number).sort(function(a,b){ return a-b; });
+
+    var groupChipsWrap = el("div", {class:"group-chip-row"});
+    groupNums.forEach(function(n){
+      var chip = el("button", {
+        class: "group-chip" + (armedGroup===n ? " armed" : ""),
+        type:"button",
+        text: n+"모둠 ("+groupCounts[n]+")",
+        onclick: function(num){ return function(){ toggleArmGroup(num); }; }(n)
+      });
+      chip.style.setProperty("--group-color", groupColor(n));
+      groupChipsWrap.appendChild(chip);
+    });
+    groupChipsWrap.appendChild(el("button", {class:"group-chip add", type:"button", text:"+ 새 모둠", onclick:addNewGroup}));
+
+    var groupHint = (armedGroup !== null)
+      ? el("p", {class:"hint armed-hint", text: armedGroup+"모둠 지정 중이에요 — 자리나 미배치 학생을 클릭해서 추가/제거하세요. 칩을 다시 누르면 끝나요."})
+      : el("p", {class:"hint", text:"모둠 칩을 누른 뒤 자리나 학생을 클릭하면 그 모둠으로 묶여요. 세로줄 단위로 훑으면서 클릭하면 편해요."});
+
+    var groupPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"모둠"}),
+      groupHint,
+      groupChipsWrap,
+      el("label", {class:"switch-row"}, [groupCheck, el("span",{text:"자리 배치 화면에 모둠 번호 표시"})]),
+      el("button", {class:"action-btn", text:"🔀 자리 기준으로 자동 채우기 (세로 4명씩)", onclick:autoFillGroupsFromSeats}),
+      el("button", {class:"action-btn danger", text:"모둠 전체 초기화", onclick:clearAllGroups})
+    ]);
+
+    var altCheck = el("input", {type:"checkbox", id:"altCheck"});
+    altCheck.checked = !!state._alternate;
+
+    var actionsPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"자리 배치하기"}),
+      el("p", {class:"hint", text:"랜덤 배치 시 바로 직전 자리로는 다시 배정되지 않아요. 자리의 🔓 을 눌러 🔒로 고정하면 랜덤 배치에서 제외돼요 — 학생이 있으면 그 학생이 계속 앉고, 빈자리면 계속 비워둬요 (학생 화면에는 표시 안 됨)."}),
+      el("button", {class:"action-btn primary", text:"🎲 전체 랜덤 배치", onclick:function(){ randomAssign("all", altCheck.checked); }}),
+      el("button", {class:"action-btn", text:"빈자리만 랜덤 배치", onclick:function(){ randomAssign("empty", altCheck.checked); }}),
+      el("label", {class:"switch-row"}, [altCheck, el("span",{text:"남녀 짝 교차 배치"})]),
+      el("p", {class:"hint", text:"♀/♂ 버튼을 누른 뒤 자리를 클릭하면 그 자리는 항상 그 성별만 랜덤 배치돼요 (미리 지정 가능, 빈자리도 가능)."}),
+      el("div", {class:"gender-arm-row"}, [
+        el("button", {class:"gender-arm-btn f"+(armedGender==="f"?" armed":""), type:"button", text:"♀ 여자\n자리 지정", onclick:function(){ toggleArmGender("f"); }}),
+        el("button", {class:"gender-arm-btn m"+(armedGender==="m"?" armed":""), type:"button", text:"♂ 남자\n자리 지정", onclick:function(){ toggleArmGender("m"); }})
+      ]),
+      el("button", {class:"action-btn", text:"성별 지정 초기화", onclick:clearAllGenderLocks}),
+      el("button", {class:"action-btn", text:"🔓 전체 고정 해제", onclick:unlockAllSeats}),
+      el("button", {class:"action-btn danger", text:"전체 비우기 (자리 비움)", onclick:clearAllSeats}),
+      el("button", {class:"action-btn", text:"🖨 인쇄하기", onclick:doPrint}),
+      el("button", {class:"action-btn", text:"🖥 학생 화면 새 창으로 열기", onclick:openStudentView}),
+      el("p", {class:"hint", text:"새 창을 TV·프로젝터로 옮겨두면 이 화면에서 배치할 때마다 자동으로 함께 업데이트돼요."})
+    ]);
+
+    // ---- saved layouts ----
+    var savedList = el("ul", {class:"saved-list"});
+    if(cls.savedLayouts.length === 0){
+      savedList.appendChild(el("li", {class:"saved-empty", text:"아직 저장된 배치가 없어요."}));
+    } else {
+      cls.savedLayouts.forEach(function(layout){
+        savedList.appendChild(el("li", {class:"saved-item"}, [
+          el("div", {class:"saved-info"}, [
+            el("span", {class:"saved-name", text:layout.name}),
+            el("span", {class:"saved-date", text:formatSavedAt(layout.savedAt)})
+          ]),
+          el("div", {class:"saved-actions"}, [
+            el("button", {class:"saved-load", text:"불러오기", onclick:function(id){ return function(){ loadLayout(id); }; }(layout.id)}),
+            el("button", {class:"saved-delete", text:"×", "aria-label":"저장된 배치 삭제", onclick:function(id){ return function(){ deleteLayout(id); }; }(layout.id)})
+          ])
+        ]));
+      });
+    }
+    var savedPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"저장된 자리 배치"}),
+      el("p", {class:"hint", text:"지금 자리 배치를 이름 붙여 저장해두고, 나중에 다시 불러올 수 있어요."}),
+      el("button", {class:"action-btn primary", text:"💾 현재 배치 저장하기", onclick:saveLayout}),
+      savedList
+    ]);
+
+    var SIDEBAR_TABS = [
+      {key:"roster", label:"👤 명단", panels:[rosterPanel]},
+      {key:"layout", label:"🏫 배치·모둠", panels:[layoutPanel, groupPanel]},
+      {key:"actions", label:"🎲 자리배치", panels:[actionsPanel]},
+      {key:"saved", label:"💾 저장", panels:[savedPanel]}
+    ];
+    if(SIDEBAR_TABS.every(function(t){ return t.key !== sidebarTab; })) sidebarTab = "roster";
+    var tabBar = el("div", {class:"sidebar-tabs"}, SIDEBAR_TABS.map(function(t){
+      return el("button", {
+        class:"sidebar-tab" + (sidebarTab===t.key ? " active" : ""),
+        type:"button", text:t.label,
+        onclick:function(k){ return function(){ sidebarTab = k; render(); }; }(t.key)
+      });
+    }));
+    var activeTab = SIDEBAR_TABS.find(function(t){ return t.key === sidebarTab; });
+    var sidebar = el("aside", {class:"sidebar"}, [tabBar, el("div", {class:"sidebar-tab-content"}, activeTab.panels)]);
+
+    // ---- stats ----
+    var unassigned = unassignedStudents(cls);
+    var total = allStudents(cls).length;
+    var stats = el("div", {class:"stats"}, [
+      el("div", {class:"stat"}, [el("div",{class:"num", text:String(total)}), el("div",{class:"label", text:"전체 학생"})]),
+      el("div", {class:"stat girl"}, [el("div",{class:"num", text:String(cls.girls.length)}), el("div",{class:"label", text:"여학생"})]),
+      el("div", {class:"stat boy"}, [el("div",{class:"num", text:String(cls.boys.length)}), el("div",{class:"label", text:"남학생"})]),
+      el("div", {class:"stat empty"}, [el("div",{class:"num", text:String(unassigned.length)}), el("div",{class:"label", text:"미배치"})])
+    ]);
+
+    // ---- classroom grid ----
+    var grid = buildGrid(cls);
+
+    var classroom = el("div", {class:"classroom"}, [
+      el("div", {class:"print-title", text: cls.name + " 자리 배치"}),
+      el("div", {class:"blackboard", text:"칠 판"}),
+      grid
+    ]);
+
+    // ---- pool ----
+    var chipsWrap = el("div", {class:"chips"});
+    if(unassigned.length === 0){
+      chipsWrap.appendChild(el("span", {class:"none", text:"모든 학생이 자리에 배치되었어요."}));
+    } else {
+      unassigned.forEach(function(s){
+        var chipClasses = ["chip", s.gender==="f"?"girl":"boy"];
+        if(selected && selected.kind==="pool" && selected.id===s.id) chipClasses.push("selected");
+        if(armedGroup !== null && s.groupNo === armedGroup) chipClasses.push("armed-member");
+        var chipText = (armedGroup !== null && s.groupNo) ? (s.name+" ("+s.groupNo+"모둠)") : s.name;
+        chipsWrap.appendChild(el("button", {
+          class: chipClasses.join(" "), type:"button",
+          onclick: function(id){ return function(){ onPoolChipClick(id); }; }(s.id),
+          text: chipText
+        }));
+      });
+    }
+    var poolPanel = el("section", {class:"pool"}, [
+      el("h2", {text:"미배치 학생 ("+unassigned.length+")"}),
+      el("p", {class:"hint", text:"학생을 누른 뒤 빈자리(또는 자리를 바꿀 학생)를 눌러 배치하세요. 자리끼리는 눌러서 서로 맞바꿀 수 있어요."}),
+      chipsWrap
+    ]);
+
+    var stage = el("main", {class:"stage"}, [stats, classroom, poolPanel]);
+    var layout = el("div", {class:"layout"}, [sidebar, stage]);
+    var footer = el("footer", {class:"meta", text:"브라우저에 자동 저장됩니다 · 반별로 따로 저장돼요"});
+
+    root.appendChild(header);
+    root.appendChild(layout);
+    root.appendChild(footer);
+  }
+
+  save();
+  render();
+})();
+</script>
+</body>
+</html>
