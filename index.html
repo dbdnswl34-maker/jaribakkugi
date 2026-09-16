@@ -6,6 +6,7 @@
 <title>자리바꿈</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#ffffff;
@@ -127,6 +128,14 @@
     padding-right:2px;
   }
   .stage{ flex:1; min-width:0; display:flex; flex-direction:column; gap:18px; }
+  @keyframes classSwitchIn{
+    from{ opacity:0; transform:translateY(14px) scale(.98); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .stage.class-switch-in{ animation:classSwitchIn .4s cubic-bezier(.16,1,.3,1); }
+  @media (prefers-reduced-motion: reduce){
+    .stage.class-switch-in{ animation:none; }
+  }
 
   .panel{
     background:var(--surface); border:2px solid var(--border); border-radius:22px;
@@ -274,6 +283,7 @@
   .seat.locked{ box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent); }
   .seat.has-group{ border-left: 4px solid var(--group-color, var(--border)); }
   .seat.armed-member{ box-shadow: inset 0 0 0 3px var(--group-color, var(--accent)); }
+  .seat.armed-separate{ box-shadow: inset 0 0 0 3px var(--danger); }
   .seat.gender-lock-f{ border-style:dashed; border-color:var(--girl); }
   .seat.gender-lock-f.empty{ background:var(--girl-soft); }
   .seat.gender-lock-m{ border-style:dashed; border-color:var(--boy); }
@@ -309,6 +319,8 @@
   .chip.boy{ border-color:color-mix(in srgb, var(--boy) 45%, var(--border)); background:var(--boy-soft); color:var(--boy); }
   .chip.selected{ outline:2px solid var(--accent); outline-offset:1px; }
   .chip.armed-member{ box-shadow: inset 0 0 0 2px var(--accent); font-weight:700; }
+  .chip.armed-separate{ box-shadow: inset 0 0 0 2px var(--danger); font-weight:700; }
+  .group-chip.separate-chip.armed{ background:var(--danger); border-color:var(--danger); color:#fff; }
   .chips .none{ font-family:'Noto Sans KR',sans-serif; font-size:.82rem; color:var(--ink-dim); }
 
   footer.meta{ font-family:'Noto Sans KR',sans-serif; text-align:center; font-size:.76rem; color:var(--ink-dim); padding:6px 0 20px; }
@@ -357,8 +369,8 @@
 
   function makeDefaultClass(name, girlCount, boyCount, cols, rows){
     var girls=[], boys=[];
-    for(var i=1;i<=girlCount;i++) girls.push({id:uid(), name:"여학생"+i, gender:"f", groupNo:0, number:"", seatHistory:[]});
-    for(var j=1;j<=boyCount;j++) boys.push({id:uid(), name:"남학생"+j, gender:"m", groupNo:0, number:"", seatHistory:[]});
+    for(var i=1;i<=girlCount;i++) girls.push({id:uid(), name:"여학생"+i, gender:"f", groupNo:0, keepApart:0, number:"", seatHistory:[]});
+    for(var j=1;j<=boyCount;j++) boys.push({id:uid(), name:"남학생"+j, gender:"m", groupNo:0, keepApart:0, number:"", seatHistory:[]});
     var seatCount = cols*rows;
     var seats = new Array(seatCount).fill(null);
     var lockedSeats = new Array(seatCount).fill(false);
@@ -418,7 +430,9 @@
   var selected = null; // {kind:'seat', idx} | {kind:'pool', id}
   var armedGroup = null; // when set, seat/pool clicks toggle group membership instead of selecting
   var armedGender = null; // "f" | "m" | null — when set, seat clicks toggle a gender-only reservation instead of selecting
+  var armedSeparate = null; // number | null — when set, seat/pool clicks toggle "keep apart" group membership instead of selecting
   var sidebarTab = "roster"; // which sidebar tab is showing: "roster" | "layout" | "actions" | "saved"
+  var justSwitchedClass = false; // true for exactly one render() right after switchClass(), to play the transition
 
   function save(){
     state.updatedAt = Date.now();
@@ -587,6 +601,7 @@
     if(c.showGroups === undefined) c.showGroups = true;
     c.girls.concat(c.boys).forEach(function(s){
       if(s.groupNo === undefined) s.groupNo = 0;
+      if(s.keepApart === undefined) s.keepApart = 0;
       if(s.number === undefined) s.number = "";
       if(!s.seatHistory) s.seatHistory = [];
     });
@@ -704,9 +719,62 @@
     }
   }
 
+  function buildKeepApartMap(cls){
+    var map = {};
+    allStudents(cls).forEach(function(s){ if(s.keepApart) map[s.id] = s.keepApart; });
+    return map;
+  }
+
+  function seatNeighbors(idx, cols, total){
+    var col = idx % cols;
+    var out = [];
+    if(col > 0) out.push(idx-1);
+    if(col < cols-1) out.push(idx+1);
+    if(idx-cols >= 0) out.push(idx-cols);
+    if(idx+cols < total) out.push(idx+cols);
+    return out;
+  }
+
+  function hasKeepApartViolation(cls, idx, sid, keepApartMap){
+    if(!sid || !keepApartMap[sid]) return false;
+    var neighbors = seatNeighbors(idx, cls.cols, cls.seats.length);
+    for(var i=0;i<neighbors.length;i++){
+      var nSid = cls.seats[neighbors[i]];
+      if(nSid && keepApartMap[nSid] === keepApartMap[sid]) return true;
+    }
+    return false;
+  }
+
+  // best-effort local search: swap students within seatIdx until none of them
+  // sit next to (left/right/front/back of) another student from their own
+  // "keep apart" group, or a fixed number of passes is exhausted
+  function fixKeepApartViolations(cls, seatIdx, keepApartMap){
+    if(seatIdx.length < 2) return;
+    for(var pass=0; pass<6; pass++){
+      var violations = seatIdx.filter(function(idx){ return hasKeepApartViolation(cls, idx, cls.seats[idx], keepApartMap); });
+      if(violations.length === 0) return;
+      var progressed = false;
+      violations.forEach(function(idx){
+        var sid = cls.seats[idx];
+        if(!hasKeepApartViolation(cls, idx, sid, keepApartMap)) return; // already fixed this pass
+        var others = shuffle(seatIdx.filter(function(o){ return o !== idx; }));
+        for(var ci=0; ci<others.length; ci++){
+          var pIdx = others[ci];
+          var pSid = cls.seats[pIdx];
+          cls.seats[idx] = pSid; cls.seats[pIdx] = sid;
+          var stillBad = hasKeepApartViolation(cls, idx, pSid, keepApartMap) || hasKeepApartViolation(cls, pIdx, sid, keepApartMap);
+          if(!stillBad){ progressed = true; break; }
+          cls.seats[idx] = sid; cls.seats[pIdx] = pSid; // revert, try next candidate
+        }
+      });
+      if(!progressed) return; // can't improve further — accept the remaining (rare) violations
+    }
+  }
+
   function randomAssign(mode, alternate){
     var cls = currentClass();
     var forbiddenMap = buildForbiddenMap(cls);
+    var keepApartMap = buildKeepApartMap(cls);
     var lockedIdx = {};
     var lockedStudentIds = {};
     for(var lp=0;lp<cls.seats.length;lp++){
@@ -742,6 +810,8 @@
       boyLockSeats.forEach(function(idx){ if(boysForLocks.length){ cls.seats[idx] = boysForLocks.pop().id; didAssign = true; } });
       fixForbiddenSeats(cls, girlLockSeats, forbiddenMap);
       fixForbiddenSeats(cls, boyLockSeats, forbiddenMap);
+      fixKeepApartViolations(cls, girlLockSeats, keepApartMap);
+      fixKeepApartViolations(cls, boyLockSeats, keepApartMap);
       var placedIds = {};
       girlLockSeats.concat(boyLockSeats).forEach(function(idx){ if(cls.seats[idx]) placedIds[cls.seats[idx]] = true; });
       pool = pool.filter(function(s){ return !placedIds[s.id]; });
@@ -788,6 +858,7 @@
       }
     }
     fixForbiddenSeats(cls, seatIdx, forbiddenMap);
+    fixKeepApartViolations(cls, seatIdx, keepApartMap);
     recordSeatHistoryForSeats(cls, girlLockSeats.concat(boyLockSeats, seatIdx));
     cls.revealToken = uid();
     save(); render();
@@ -819,6 +890,13 @@
     if(armedGender !== null){
       cls.seatGenderLock[idx] = (cls.seatGenderLock[idx] === armedGender) ? null : armedGender;
       save(); render();
+      return;
+    }
+    if(armedSeparate !== null){
+      var sepSid = cls.seats[idx];
+      if(!sepSid) return;
+      var sepS = studentById(cls, sepSid);
+      if(sepS){ sepS.keepApart = (sepS.keepApart === armedSeparate) ? 0 : armedSeparate; save(); render(); }
       return;
     }
     if(selected === null){
@@ -861,6 +939,12 @@
       if(s){ s.groupNo = (s.groupNo === armedGroup) ? 0 : armedGroup; save(); render(); }
       return;
     }
+    if(armedSeparate !== null){
+      var sepCls = currentClass();
+      var sepS = studentById(sepCls, id);
+      if(sepS){ sepS.keepApart = (sepS.keepApart === armedSeparate) ? 0 : armedSeparate; save(); render(); }
+      return;
+    }
     if(selected && selected.kind==="pool" && selected.id===id){ selected = null; }
     else{ selected = {kind:"pool", id:id}; }
     render();
@@ -869,6 +953,7 @@
   function toggleArmGroup(n){
     armedGroup = (armedGroup === n) ? null : n;
     armedGender = null;
+    armedSeparate = null;
     selected = null;
     render();
   }
@@ -880,6 +965,7 @@
     existing.forEach(function(g){ if(g >= next) next = g+1; });
     armedGroup = next;
     armedGender = null;
+    armedSeparate = null;
     selected = null;
     render();
   }
@@ -887,8 +973,37 @@
   function toggleArmGender(g){
     armedGender = (armedGender === g) ? null : g;
     armedGroup = null;
+    armedSeparate = null;
     selected = null;
     render();
+  }
+
+  function toggleArmSeparate(n){
+    armedSeparate = (armedSeparate === n) ? null : n;
+    armedGroup = null;
+    armedGender = null;
+    selected = null;
+    render();
+  }
+
+  function addNewSeparateGroup(){
+    var cls = currentClass();
+    var existing = cls.girls.concat(cls.boys).map(function(s){ return s.keepApart || 0; });
+    var next = 1;
+    existing.forEach(function(g){ if(g >= next) next = g+1; });
+    armedSeparate = next;
+    armedGroup = null;
+    armedGender = null;
+    selected = null;
+    render();
+  }
+
+  function clearAllSeparate(){
+    var cls = currentClass();
+    if(!confirm("모든 학생의 분리 지정을 초기화할까요?")) return;
+    cls.girls.concat(cls.boys).forEach(function(s){ s.keepApart = 0; });
+    armedSeparate = null;
+    save(); render();
   }
 
   function clearAllGenderLocks(){
@@ -901,7 +1016,7 @@
     var cls = currentClass();
     var list = gender==="f" ? cls.girls : cls.boys;
     var label = gender==="f" ? "여학생" : "남학생";
-    list.push({id:uid(), name:label+(list.length+1), gender:gender, groupNo:0, number:"", seatHistory:[]});
+    list.push({id:uid(), name:label+(list.length+1), gender:gender, groupNo:0, keepApart:0, number:"", seatHistory:[]});
     save(); render();
   }
 
@@ -1079,6 +1194,75 @@
     save(); render();
   }
 
+  // ---- excel roster import ----
+  var GENDER_TOKENS = { "여":"f", "여자":"f", "여학생":"f", "f":"f", "female":"f", "남":"m", "남자":"m", "남학생":"m", "m":"m", "male":"m" };
+  var ROSTER_HEADER_LABELS = ["번호","이름","성명","학생명","성별","순번","연번","no","name","number","gender","no.","num"];
+
+  function parseRosterSheetRows(rows){
+    var girls = [], boys = [];
+    rows.forEach(function(row){
+      if(!row || !row.length) return;
+      var cells = row.map(function(c){ return (c===null||c===undefined) ? "" : String(c).trim(); }).filter(function(c){ return c!==""; });
+      if(cells.length === 0) return;
+      var looksLikeHeader = cells.every(function(c){ return ROSTER_HEADER_LABELS.indexOf(c.toLowerCase()) > -1; });
+      if(looksLikeHeader) return;
+      var number = "", gender = null, name = "";
+      cells.forEach(function(c){
+        if(!number && /^\d{1,3}$/.test(c)){ number = c; return; }
+        if(!gender && GENDER_TOKENS[c.toLowerCase()]){ gender = GENDER_TOKENS[c.toLowerCase()]; return; }
+      });
+      cells.forEach(function(c){
+        if(name) return;
+        if(c === number) return;
+        if(GENDER_TOKENS[c.toLowerCase()]) return;
+        name = c;
+      });
+      if(!name || name === "이름" || name === "성명" || name === "학생명") return;
+      var rec = { id:uid(), name:name, gender:gender || "f", groupNo:0, keepApart:0, number:number, seatHistory:[] };
+      if(rec.gender === "f") girls.push(rec); else boys.push(rec);
+    });
+    return { girls:girls, boys:boys };
+  }
+
+  function triggerRosterExcelImport(){
+    var input = document.getElementById("import-excel-input");
+    if(input) input.click();
+  }
+
+  function importRosterFromExcel(file){
+    if(!file) return;
+    if(typeof XLSX === "undefined"){
+      alert("엑셀 처리 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.");
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var parsed;
+      try{
+        var wb = XLSX.read(e.target.result, {type:"array"});
+        var sheet = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, defval:""});
+        parsed = parseRosterSheetRows(rows);
+      }catch(err){ alert("엑셀 파일을 읽지 못했어요. 파일 형식을 확인해주세요."); return; }
+      if(!parsed || (parsed.girls.length===0 && parsed.boys.length===0)){
+        alert("엑셀에서 학생 이름을 찾지 못했어요. 한 행에 이름(+선택: 번호, 성별 '여'/'남')이 있는지 확인해주세요.");
+        return;
+      }
+      var cls = currentClass();
+      if(!confirm("엑셀에서 여학생 "+parsed.girls.length+"명, 남학생 "+parsed.boys.length+"명을 찾았어요. 지금 학생 명단을 이걸로 바꿀까요? (지금 명단은 사라지고, 명단에 없어지는 학생은 자리에서도 빠져요)")) return;
+      cls.girls = parsed.girls;
+      cls.boys = parsed.boys;
+      var validIds = {};
+      cls.girls.concat(cls.boys).forEach(function(s){ validIds[s.id] = true; });
+      for(var i=0;i<cls.seats.length;i++){
+        if(cls.seats[i] && !validIds[cls.seats[i]]) cls.seats[i] = null;
+      }
+      selected = null;
+      save(); render();
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
   function exportState(){
     var dataStr = JSON.stringify(state, null, 2);
     var blob = new Blob([dataStr], {type:"application/json"});
@@ -1121,10 +1305,12 @@
   }
 
   function switchClass(id){
+    if(id === state.currentClassId) return;
     state.currentClassId = id;
     selected = null;
     armedGroup = null;
     armedGender = null;
+    justSwitchedClass = true;
     save(); render();
   }
 
@@ -1175,6 +1361,7 @@
         if(isLocked) seatClasses.push("locked");
         if(g) seatClasses.push("has-group");
         if(armedGroup !== null && occupant && occupant.groupNo === armedGroup) seatClasses.push("armed-member");
+        if(armedSeparate !== null && occupant && occupant.keepApart === armedSeparate) seatClasses.push("armed-separate");
         if(cls.seatGenderLock[idx] === "f") seatClasses.push("gender-lock-f");
         else if(cls.seatGenderLock[idx] === "m") seatClasses.push("gender-lock-m");
 
@@ -1232,6 +1419,14 @@
       e.target.value = "";
     });
 
+    var importExcelInput = el("input", {type:"file", id:"import-excel-input", accept:".xlsx,.xls,.csv"});
+    importExcelInput.style.display = "none";
+    importExcelInput.addEventListener("change", function(e){
+      var f = e.target.files && e.target.files[0];
+      importRosterFromExcel(f);
+      e.target.value = "";
+    });
+
     var header = el("header", {class:"board"}, [
       el("h1", {text:"자리바꿈"}),
       el("span", {class:"tagline", text:"초등학교 학급 자리 배치 도구"}),
@@ -1270,6 +1465,9 @@
     var rosterPanel = el("section", {class:"panel"}, [
       el("h2", {text:"학생 명단"}),
       el("p", {class:"hint", text:"이름을 눌러 바로 수정하세요. 앞 칸에는 출석 번호를 입력할 수 있어요. 예시 이름은 자유롭게 실제 학생 이름으로 바꿀 수 있어요."}),
+      el("button", {class:"action-btn", text:"📊 엑셀 파일로 명단 올리기", onclick:triggerRosterExcelImport}),
+      el("p", {class:"hint", text:"한 행에 이름 1개씩, 번호와 성별(여/남) 칸이 있으면 자동으로 같이 읽어요. 올리면 지금 명단을 통째로 바꿔요."}),
+      importExcelInput,
       el("div", {class:"roster-cols"}, [
         rosterCol("f", cls.girls, "여학생"),
         rosterCol("m", cls.boys, "남학생")
@@ -1327,6 +1525,35 @@
       el("label", {class:"switch-row"}, [groupCheck, el("span",{text:"자리 배치 화면에 모둠 번호 표시"})]),
       el("button", {class:"action-btn", text:"🔀 자리 기준으로 자동 채우기 (세로 4명씩)", onclick:autoFillGroupsFromSeats}),
       el("button", {class:"action-btn danger", text:"모둠 전체 초기화", onclick:clearAllGroups})
+    ]);
+
+    // ---- keep-apart (separate) groups ----
+    var separateCounts = {};
+    allStudents(cls).forEach(function(s){ var g=s.keepApart||0; if(g>0) separateCounts[g] = (separateCounts[g]||0)+1; });
+    if(armedSeparate !== null && !(armedSeparate in separateCounts)) separateCounts[armedSeparate] = 0;
+    var separateNums = Object.keys(separateCounts).map(Number).sort(function(a,b){ return a-b; });
+
+    var separateChipsWrap = el("div", {class:"group-chip-row"});
+    separateNums.forEach(function(n){
+      var chip = el("button", {
+        class: "group-chip separate-chip" + (armedSeparate===n ? " armed" : ""),
+        type:"button",
+        text: n+"번 분리 ("+separateCounts[n]+")",
+        onclick: function(num){ return function(){ toggleArmSeparate(num); }; }(n)
+      });
+      separateChipsWrap.appendChild(chip);
+    });
+    separateChipsWrap.appendChild(el("button", {class:"group-chip add", type:"button", text:"+ 새 분리 그룹", onclick:addNewSeparateGroup}));
+
+    var separateHint = (armedSeparate !== null)
+      ? el("p", {class:"hint armed-hint", text: armedSeparate+"번 분리 지정 중이에요 — 떠드는 학생들을 클릭해서 추가/제거하세요. 이 학생들은 랜덤 배치 때 서로 옆이나 앞뒤 자리를 피해요. 칩을 다시 누르면 끝나요."})
+      : el("p", {class:"hint", text:"분리 칩을 누른 뒤 자리나 학생을 클릭하면 그 그룹으로 묶여요. 같은 그룹 학생들은 랜덤 배치 시 서로 옆·앞뒤 자리에 앉지 않도록 최대한 피해요 (자리가 너무 좁으면 완벽히 피하지 못할 수도 있어요)."});
+
+    var separatePanel = el("section", {class:"panel"}, [
+      el("h2", {text:"🙊 떠드는 학생 분리"}),
+      separateHint,
+      separateChipsWrap,
+      el("button", {class:"action-btn danger", text:"분리 지정 전체 초기화", onclick:clearAllSeparate})
     ]);
 
     var altCheck = el("input", {type:"checkbox", id:"altCheck"});
@@ -1434,10 +1661,9 @@
 
     var SIDEBAR_TABS = [
       {key:"roster", label:"👤 명단", panels:[rosterPanel, savedRosterPanel]},
-      {key:"layout", label:"🏫 배치·모둠", panels:[layoutPanel, groupPanel]},
+      {key:"layout", label:"🏫 배치·모둠", panels:[layoutPanel, groupPanel, separatePanel]},
       {key:"actions", label:"🎲 자리배치", panels:[actionsPanel]},
-      {key:"saved", label:"💾 저장", panels:[savedPanel]},
-      {key:"sync", label:"☁ 동기화", panels:[syncPanel]}
+      {key:"saved", label:"💾 저장·동기화", panels:[savedPanel, syncPanel]}
     ];
     if(SIDEBAR_TABS.every(function(t){ return t.key !== sidebarTab; })) sidebarTab = "roster";
     var tabBar = el("div", {class:"sidebar-tabs"}, SIDEBAR_TABS.map(function(t){
@@ -1478,6 +1704,7 @@
         var chipClasses = ["chip", s.gender==="f"?"girl":"boy"];
         if(selected && selected.kind==="pool" && selected.id===s.id) chipClasses.push("selected");
         if(armedGroup !== null && s.groupNo === armedGroup) chipClasses.push("armed-member");
+        if(armedSeparate !== null && s.keepApart === armedSeparate) chipClasses.push("armed-separate");
         var chipText = (armedGroup !== null && s.groupNo) ? (s.name+" ("+s.groupNo+"모둠)") : s.name;
         chipsWrap.appendChild(el("button", {
           class: chipClasses.join(" "), type:"button",
@@ -1492,7 +1719,8 @@
       chipsWrap
     ]);
 
-    var stage = el("main", {class:"stage"}, [stats, classroom, poolPanel]);
+    var stage = el("main", {class:"stage"+(justSwitchedClass?" class-switch-in":"")}, [stats, classroom, poolPanel]);
+    justSwitchedClass = false;
     var layout = el("div", {class:"layout"}, [sidebar, stage]);
     var footer = el("footer", {class:"meta", text:"브라우저에 자동 저장됩니다 · 반별로 따로 저장돼요"});
 
