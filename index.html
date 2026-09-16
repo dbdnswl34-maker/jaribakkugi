@@ -884,6 +884,47 @@
     save(); render();
   }
 
+  function exportState(){
+    var dataStr = JSON.stringify(state, null, 2);
+    var blob = new Blob([dataStr], {type:"application/json"});
+    var url = URL.createObjectURL(blob);
+    var d = new Date();
+    function pad(n){ return (n<10?"0":"")+n; }
+    var fname = "자리바꿈_백업_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"_"+pad(d.getHours())+pad(d.getMinutes())+".json";
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function triggerImport(){
+    var input = document.getElementById("import-file-input");
+    if(input) input.click();
+  }
+
+  function importStateFromFile(file){
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var parsed;
+      try{ parsed = JSON.parse(e.target.result); }catch(err){ alert("파일을 읽을 수 없어요. 올바른 백업 파일인지 확인해주세요."); return; }
+      if(!parsed || !parsed.classes || !parsed.classes.length){ alert("올바른 백업 파일이 아니에요."); return; }
+      if(!confirm("백업 파일을 불러올까요? 지금 이 브라우저에 저장된 모든 반의 배치가 파일 내용으로 덮어써져요.")) return;
+      state = parsed;
+      if(!state.currentClassId || !state.classes.some(function(c){ return c.id === state.currentClassId; })){
+        state.currentClassId = state.classes[0].id;
+      }
+      selected = null;
+      armedGroup = null;
+      armedGender = null;
+      save(); render();
+    };
+    reader.readAsText(file);
+  }
+
   function switchClass(id){
     state.currentClassId = id;
     selected = null;
@@ -988,6 +1029,14 @@
     var nameInput = el("input", {type:"text", value:"", oninput:function(e){ renameClass(e.target.value); }});
     nameInput.value = cls.name;
 
+    var importInput = el("input", {type:"file", id:"import-file-input", accept:"application/json"});
+    importInput.style.display = "none";
+    importInput.addEventListener("change", function(e){
+      var f = e.target.files && e.target.files[0];
+      importStateFromFile(f);
+      e.target.value = "";
+    });
+
     var header = el("header", {class:"board"}, [
       el("h1", {text:"자리바꿈"}),
       el("span", {class:"tagline", text:"초등학교 학급 자리 배치 도구"}),
@@ -995,7 +1044,10 @@
         classSelect,
         nameInput,
         el("button", {class:"icon-btn", text:"+ 새 반", onclick:addClass}),
-        el("button", {class:"icon-btn", text:"반 삭제", onclick:deleteClass})
+        el("button", {class:"icon-btn", text:"반 삭제", onclick:deleteClass}),
+        el("button", {class:"icon-btn", title:"모든 반의 배치를 파일로 저장", text:"⬇ 내보내기", onclick:exportState}),
+        el("button", {class:"icon-btn", title:"파일에서 배치 불러오기", text:"⬆ 불러오기", onclick:triggerImport}),
+        importInput
       ])
     ]);
 
