@@ -358,7 +358,7 @@
     var seats = new Array(seatCount).fill(null);
     var lockedSeats = new Array(seatCount).fill(false);
     var seatGenderLock = new Array(seatCount).fill(null);
-    return { id:uid(), name:name, cols:cols, rows:rows, pairMode:true, showGroups:true, girls:girls, boys:boys, seats:seats, lockedSeats:lockedSeats, seatGenderLock:seatGenderLock, savedLayouts:[], revealToken:null };
+    return { id:uid(), name:name, cols:cols, rows:rows, pairMode:true, showGroups:true, girls:girls, boys:boys, seats:seats, lockedSeats:lockedSeats, seatGenderLock:seatGenderLock, savedLayouts:[], savedRosters:[], revealToken:null };
   }
 
   function chunkGroupSizes(n){
@@ -426,6 +426,7 @@
     }
     if(!c){ c = state.classes[0]; state.currentClassId = c.id; }
     if(!c.savedLayouts) c.savedLayouts = [];
+    if(!c.savedRosters) c.savedRosters = [];
     if(!c.lockedSeats) c.lockedSeats = new Array(c.seats.length).fill(false);
     if(!c.seatGenderLock) c.seatGenderLock = new Array(c.seats.length).fill(null);
     if(c.showGroups === undefined) c.showGroups = true;
@@ -884,6 +885,45 @@
     save(); render();
   }
 
+  function saveRoster(){
+    var cls = currentClass();
+    var suggested = formatSavedAt(Date.now())+" 명단";
+    var name = window.prompt("저장할 명단 이름을 입력하세요", suggested);
+    if(name === null) return;
+    name = name.trim() || suggested;
+    cls.savedRosters.unshift({
+      id: uid(),
+      name: name,
+      savedAt: Date.now(),
+      girls: JSON.parse(JSON.stringify(cls.girls)),
+      boys: JSON.parse(JSON.stringify(cls.boys))
+    });
+    save(); render();
+  }
+
+  function loadRoster(rosterId){
+    var cls = currentClass();
+    var roster = cls.savedRosters.find(function(r){ return r.id === rosterId; });
+    if(!roster) return;
+    if(!confirm('"'+roster.name+'" 명단을 불러올까요? 지금 학생 명단은 덮어써지고, 새 명단에 없는 학생은 자리에서도 빠져요.')) return;
+    cls.girls = JSON.parse(JSON.stringify(roster.girls));
+    cls.boys = JSON.parse(JSON.stringify(roster.boys));
+    var validIds = {};
+    cls.girls.concat(cls.boys).forEach(function(s){ validIds[s.id] = true; });
+    for(var i=0;i<cls.seats.length;i++){
+      if(cls.seats[i] && !validIds[cls.seats[i]]) cls.seats[i] = null;
+    }
+    selected = null;
+    save(); render();
+  }
+
+  function deleteRoster(rosterId){
+    var cls = currentClass();
+    if(!confirm("저장된 명단을 삭제할까요?")) return;
+    cls.savedRosters = cls.savedRosters.filter(function(r){ return r.id !== rosterId; });
+    save(); render();
+  }
+
   function exportState(){
     var dataStr = JSON.stringify(state, null, 2);
     var blob = new Blob([dataStr], {type:"application/json"});
@@ -1181,8 +1221,34 @@
       savedList
     ]);
 
+    // ---- saved rosters ----
+    var savedRosterList = el("ul", {class:"saved-list"});
+    if(cls.savedRosters.length === 0){
+      savedRosterList.appendChild(el("li", {class:"saved-empty", text:"아직 저장된 명단이 없어요."}));
+    } else {
+      cls.savedRosters.forEach(function(roster){
+        savedRosterList.appendChild(el("li", {class:"saved-item"}, [
+          el("div", {class:"saved-info"}, [
+            el("span", {class:"saved-name", text:roster.name}),
+            el("span", {class:"saved-date", text:formatSavedAt(roster.savedAt)+" · 여"+roster.girls.length+" 남"+roster.boys.length})
+          ]),
+          el("div", {class:"saved-actions"}, [
+            el("button", {class:"saved-load", text:"불러오기", onclick:function(id){ return function(){ loadRoster(id); }; }(roster.id)}),
+            el("button", {class:"saved-delete", text:"×", "aria-label":"저장된 명단 삭제", onclick:function(id){ return function(){ deleteRoster(id); }; }(roster.id)})
+          ])
+        ]));
+      });
+    }
+    var savedRosterPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"저장된 학생 명단"}),
+      el("p", {class:"hint", text:"지금 학생 명단(이름·번호)을 이름 붙여 저장해두고, 나중에 다시 불러올 수 있어요. 자리 배치와는 따로 저장돼요."}),
+      el("button", {class:"action-btn primary", text:"📋 현재 명단 저장하기", onclick:saveRoster}),
+      savedRosterList
+    ]);
+
     var SIDEBAR_TABS = [
       {key:"roster", label:"👤 명단", panels:[rosterPanel]},
+      {key:"rosterSaved", label:"📋 명단 저장", panels:[savedRosterPanel]},
       {key:"layout", label:"🏫 배치·모둠", panels:[layoutPanel, groupPanel]},
       {key:"actions", label:"🎲 자리배치", panels:[actionsPanel]},
       {key:"saved", label:"💾 저장", panels:[savedPanel]}
