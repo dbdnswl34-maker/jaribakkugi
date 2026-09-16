@@ -338,6 +338,11 @@
 (function(){
   "use strict";
   var STORAGE_KEY = "jaribakkum_v1";
+  var SYNC_KEY = "jaribakkum_sync_v1";
+  var SYNC_REPO_OWNER = "dbdnswl34-maker";
+  var SYNC_REPO_NAME = "jaribakkugi-data";
+  var SYNC_FILE_PATH = "backup.json";
+  var SYNC_BRANCH = "main";
 
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 
@@ -416,7 +421,157 @@
   var sidebarTab = "roster"; // which sidebar tab is showing: "roster" | "layout" | "actions" | "saved"
 
   function save(){
+    state.updatedAt = Date.now();
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    scheduleCloudPush();
+  }
+
+  // ---- cloud sync (stores a JSON backup in a private GitHub repo) ----
+  var syncStatus = { syncing:false, lastSync:null, error:null };
+  var syncPushTimer = null;
+
+  function loadSyncConfig(){
+    try{
+      var raw = localStorage.getItem(SYNC_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    return null;
+  }
+  function saveSyncConfig(cfg){
+    try{ localStorage.setItem(SYNC_KEY, JSON.stringify(cfg)); }catch(e){}
+  }
+  function clearSyncConfig(){
+    try{ localStorage.removeItem(SYNC_KEY); }catch(e){}
+  }
+  function syncApiUrl(){
+    return "https://api.github.com/repos/"+SYNC_REPO_OWNER+"/"+SYNC_REPO_NAME+"/contents/"+SYNC_FILE_PATH;
+  }
+  function b64EncodeUnicode(str){ return btoa(unescape(encodeURIComponent(str))); }
+  function b64DecodeUnicode(str){ return decodeURIComponent(escape(atob(str))); }
+
+  // cb(null) on error/not-connected; cb({data:null, sha:null}) if no backup exists yet; else cb({data, sha})
+  function cloudPull(cb){
+    var cfg = loadSyncConfig();
+    if(!cfg || !cfg.token){ cb(null); return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", syncApiUrl()+"?ref="+SYNC_BRANCH, true);
+    xhr.setRequestHeader("Authorization", "token "+cfg.token);
+    xhr.setRequestHeader("Accept", "application/vnd.github+json");
+    xhr.onreadystatechange = function(){
+      if(xhr.readyState !== 4) return;
+      if(xhr.status === 200){
+        try{
+          var res = JSON.parse(xhr.responseText);
+          var data = JSON.parse(b64DecodeUnicode(res.content.replace(/\n/g,"")));
+          cb({ data:data, sha:res.sha });
+        }catch(e){ cb(null); }
+      } else if(xhr.status === 404){
+        cb({ data:null, sha:null });
+      } else {
+        cb(null);
+      }
+    };
+    xhr.send();
+  }
+
+  function applyCloudState(data){
+    state = data;
+    if(!state.currentClassId || !state.classes.some(function(c){ return c.id === state.currentClassId; })){
+      state.currentClassId = state.classes[0].id;
+    }
+    selected = null; armedGroup = null; armedGender = null;
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  function scheduleCloudPush(){
+    var cfg = loadSyncConfig();
+    if(!cfg || !cfg.token) return;
+    if(syncPushTimer) clearTimeout(syncPushTimer);
+    syncPushTimer = setTimeout(function(){ cloudPush(false); }, 5000);
+  }
+
+  function cloudPush(refreshUi){
+    var cfg = loadSyncConfig();
+    if(!cfg || !cfg.token) return;
+    syncStatus.syncing = true;
+    syncStatus.error = null;
+    if(refreshUi) render();
+    cloudPull(function(existing){
+      if(existing === null){
+        syncStatus.syncing = false;
+        syncStatus.error = "동기화 실패 — 코드나 연결 상태를 확인해주세요.";
+        if(refreshUi || sidebarTab === "sync") render();
+        return;
+      }
+      var body = {
+        message: "자동 동기화 "+new Date().toISOString(),
+        content: b64EncodeUnicode(JSON.stringify(state, null, 2)),
+        branch: SYNC_BRANCH
+      };
+      if(existing.sha) body.sha = existing.sha;
+      var xhr = new XMLHttpRequest();
+      xhr.open("PUT", syncApiUrl(), true);
+      xhr.setRequestHeader("Authorization", "token "+cfg.token);
+      xhr.setRequestHeader("Accept", "application/vnd.github+json");
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.onreadystatechange = function(){
+        if(xhr.readyState !== 4) return;
+        syncStatus.syncing = false;
+        if(xhr.status === 200 || xhr.status === 201){
+          syncStatus.lastSync = new Date();
+          syncStatus.error = null;
+        } else {
+          syncStatus.error = "동기화 실패 (코드 "+xhr.status+")";
+        }
+        if(refreshUi || sidebarTab === "sync") render();
+      };
+      xhr.send(JSON.stringify(body));
+    });
+  }
+
+  function connectSync(token){
+    if(!token){ alert("동기화 코드를 입력해주세요."); return; }
+    saveSyncConfig({ token: token });
+    syncStatus.error = null;
+    render();
+    cloudPull(function(existing){
+      if(existing === null){
+        syncStatus.error = "연결 실패 — 코드를 다시 확인해주세요.";
+        render();
+        return;
+      }
+      if(existing.data){
+        var cloudUpdatedAt = existing.data.updatedAt || 0;
+        var localUpdatedAt = state.updatedAt || 0;
+        if(cloudUpdatedAt > localUpdatedAt){
+          if(confirm("클라우드에 저장된 데이터가 더 최신이에요. 불러올까요? (지금 이 화면 내용은 덮어써져요)")){
+            applyCloudState(existing.data);
+            render();
+            return;
+          }
+        }
+      }
+      cloudPush(true);
+    });
+  }
+
+  function disconnectSync(){
+    if(!confirm("클라우드 동기화를 연결 해제할까요? 클라우드에 저장된 데이터는 그대로 남아있어요.")) return;
+    clearSyncConfig();
+    syncStatus = { syncing:false, lastSync:null, error:null };
+    render();
+  }
+
+  function manualCloudPull(){
+    var cfg = loadSyncConfig();
+    if(!cfg || !cfg.token){ alert("먼저 동기화 코드를 연결해주세요."); return; }
+    cloudPull(function(existing){
+      if(existing === null){ alert("클라우드에서 불러오지 못했어요. 코드나 연결 상태를 확인해주세요."); return; }
+      if(!existing.data){ alert("클라우드에 저장된 데이터가 아직 없어요."); return; }
+      if(!confirm("클라우드 데이터를 불러올까요? 지금 이 화면(로컬) 내용은 덮어써져요.")) return;
+      applyCloudState(existing.data);
+      render();
+    });
   }
 
   function currentClass(){
@@ -1246,12 +1401,44 @@
       savedRosterList
     ]);
 
+    // ---- cloud sync ----
+    var syncCfg = loadSyncConfig();
+    var tokenInput = el("input", {type:"password", placeholder:"GitHub 개인 액세스 토큰(PAT) 붙여넣기"});
+    tokenInput.value = syncCfg && syncCfg.token ? syncCfg.token : "";
+    var syncStatusText;
+    if(!syncCfg || !syncCfg.token){
+      syncStatusText = "아직 연결되지 않았어요. 아래에 코드를 붙여넣고 연결하세요.";
+    } else if(syncStatus.syncing){
+      syncStatusText = "☁ 동기화 중...";
+    } else if(syncStatus.error){
+      syncStatusText = "⚠ "+syncStatus.error;
+    } else if(syncStatus.lastSync){
+      syncStatusText = "✅ 연결됨 · 마지막 동기화 "+formatSavedAt(syncStatus.lastSync.getTime());
+    } else {
+      syncStatusText = "✅ 연결됨 (아직 동기화 전)";
+    }
+    var syncPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"☁ 클라우드 자동 동기화"}),
+      el("p", {class:"hint", text:"한 번 연결해두면 이 화면에서 바뀐 내용이 자동으로 클라우드에 저장되고, 같은 코드를 연결한 다른 컴퓨터에서도 최신 내용을 불러올 수 있어요."}),
+      el("p", {class:"hint", text:syncStatusText}),
+      el("div", {class:"field-row"}, [el("span",{text:"동기화 코드"}), tokenInput]),
+      el("div", {class:"gender-arm-row"}, [
+        el("button", {class:"action-btn primary", text:"🔗 연결하기", onclick:function(){ connectSync(tokenInput.value.trim()); }}),
+        el("button", {class:"action-btn danger", text:"연결 해제", onclick:disconnectSync})
+      ]),
+      el("div", {class:"gender-arm-row"}, [
+        el("button", {class:"action-btn", text:"⬇ 클라우드에서 지금 불러오기", onclick:manualCloudPull}),
+        el("button", {class:"action-btn", text:"⬆ 클라우드로 지금 저장하기", onclick:function(){ cloudPush(true); }})
+      ])
+    ]);
+
     var SIDEBAR_TABS = [
       {key:"roster", label:"👤 명단", panels:[rosterPanel]},
       {key:"rosterSaved", label:"📋 명단 저장", panels:[savedRosterPanel]},
       {key:"layout", label:"🏫 배치·모둠", panels:[layoutPanel, groupPanel]},
       {key:"actions", label:"🎲 자리배치", panels:[actionsPanel]},
-      {key:"saved", label:"💾 저장", panels:[savedPanel]}
+      {key:"saved", label:"💾 저장", panels:[savedPanel]},
+      {key:"sync", label:"☁ 동기화", panels:[syncPanel]}
     ];
     if(SIDEBAR_TABS.every(function(t){ return t.key !== sidebarTab; })) sidebarTab = "roster";
     var tabBar = el("div", {class:"sidebar-tabs"}, SIDEBAR_TABS.map(function(t){
@@ -1317,6 +1504,29 @@
 
   save();
   render();
+
+  // on load, check whether a connected cloud backup is newer than this device's local data
+  (function initialCloudSync(){
+    var cfg = loadSyncConfig();
+    if(!cfg || !cfg.token) return;
+    cloudPull(function(existing){
+      if(existing === null){
+        syncStatus.error = "동기화 실패 — 코드나 연결 상태를 확인해주세요.";
+        if(sidebarTab === "sync") render();
+        return;
+      }
+      if(existing.data){
+        var cloudUpdatedAt = existing.data.updatedAt || 0;
+        var localUpdatedAt = state.updatedAt || 0;
+        if(cloudUpdatedAt > localUpdatedAt){
+          if(confirm("클라우드에 더 최신 데이터가 있어요. 불러올까요? (지금 화면 내용은 덮어써져요)")){
+            applyCloudState(existing.data);
+            render();
+          }
+        }
+      }
+    });
+  })();
 })();
 </script>
 </body>
