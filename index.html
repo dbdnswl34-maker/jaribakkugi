@@ -137,6 +137,19 @@
     .stage.class-switch-in{ animation:none; }
   }
 
+  .class-toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-12px);
+    background:var(--ink); color:#fff; padding:10px 22px; border-radius:14px;
+    font-family:'Noto Sans KR',sans-serif; font-size:.92rem; font-weight:700;
+    box-shadow:var(--shadow); z-index:1000; opacity:0; pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease; white-space:nowrap;
+  }
+  .class-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  @media (prefers-reduced-motion: reduce){
+    .class-toast{ transition:opacity .01s linear; transform:translateX(-50%); }
+    .class-toast.show{ transform:translateX(-50%); }
+  }
+
   .panel{
     background:var(--surface); border:2px solid var(--border); border-radius:22px;
     padding:16px; box-shadow:var(--shadow);
@@ -1326,12 +1339,35 @@
 
   function switchClass(id){
     if(id === state.currentClassId) return;
+    var target = state.classes.find(function(c){ return c.id === id; });
     state.currentClassId = id;
     selected = null;
     armedGroup = null;
     armedGender = null;
     justSwitchedClass = true;
     save(); render();
+    if(target) showClassToast(target.name);
+  }
+
+  var classToastHideTimer = null, classToastRemoveTimer = null;
+  function showClassToast(name){
+    clearTimeout(classToastHideTimer);
+    clearTimeout(classToastRemoveTimer);
+    var toast = document.getElementById("class-toast");
+    if(!toast){
+      toast = document.createElement("div");
+      toast.id = "class-toast";
+      toast.className = "class-toast";
+      document.body.appendChild(toast);
+    }
+    toast.textContent = "🔀 " + name + "(으)로 전환했어요";
+    toast.classList.remove("show");
+    void toast.offsetHeight; // force reflow so re-triggering the class restarts the transition
+    toast.classList.add("show");
+    classToastHideTimer = setTimeout(function(){
+      toast.classList.remove("show");
+      classToastRemoveTimer = setTimeout(function(){ toast.remove(); }, 300);
+    }, 1500);
   }
 
   function renameClass(name){
