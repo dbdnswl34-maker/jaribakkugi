@@ -325,6 +325,26 @@
 
   footer.meta{ font-family:'Noto Sans KR',sans-serif; text-align:center; font-size:.76rem; color:var(--ink-dim); padding:6px 0 20px; }
 
+  /* on a monitor-sized screen, shrink the seat grid to fit entirely within
+     the viewport instead of letting the page scroll — sizes are computed by
+     fitSeatsToScreen() into the --seat-* custom properties below */
+  @media (min-width: 861px){
+    .app{ height:100vh; overflow:hidden; }
+    .layout{ min-height:0; overflow:hidden; align-items:stretch; }
+    .sidebar{ max-height:none; position:static; }
+    .stage{ min-height:0; overflow:hidden; }
+    .stats{ flex:0 0 auto; }
+    .classroom{ flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+    .blackboard{ flex:0 0 auto; }
+    .grid-wrap{ flex:1; min-height:0; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .grid{ min-width:0; gap:var(--seat-gap, 10px); }
+    .seat{ width:var(--seat-w, 108px); height:var(--seat-h, 88px); aspect-ratio:unset; min-width:0; }
+    .seat .seat-name{ font-size:var(--seat-font, 1.55rem); }
+    .seat.empty .seat-name{ font-size:calc(var(--seat-font, 1.55rem) * 0.71); }
+    .seat-group{ font-size:var(--badge-font, .64rem); }
+    .pool{ flex:0 0 auto; max-height:180px; overflow-y:auto; }
+  }
+
   @media (max-width: 860px){
     .layout{ flex-direction:column; padding:14px; }
     .sidebar{ width:100%; flex:none; position:static; max-height:none; }
@@ -1337,11 +1357,16 @@
     return e;
   }
 
+  function isDesktopFit(){
+    return window.matchMedia("(min-width: 861px)").matches;
+  }
+
   function buildGrid(cls){
+    var fitMode = isDesktopFit();
     var colTemplateParts = [];
     for(var c=0;c<cls.cols;c++){
-      colTemplateParts.push("minmax(104px,1fr)");
-      if(cls.pairMode && c%2===1 && c!==cls.cols-1) colTemplateParts.push("22px");
+      colTemplateParts.push(fitMode ? "var(--seat-w, 108px)" : "minmax(104px,1fr)");
+      if(cls.pairMode && c%2===1 && c!==cls.cols-1) colTemplateParts.push(fitMode ? "var(--spacer-w, 22px)" : "22px");
     }
     var grid = el("div", {class:"grid"});
     grid.style.gridTemplateColumns = colTemplateParts.join(" ");
@@ -1393,6 +1418,44 @@
       }
     }
     return grid;
+  }
+
+  function fitSeatsToScreen(cls, gridWrapEl, gridEl){
+    var wrapW = gridWrapEl.clientWidth;
+    var wrapH = gridWrapEl.clientHeight;
+    if(wrapW <= 0 || wrapH <= 0) return;
+    var cols = cls.cols, rows = cls.rows;
+    var spacerCols = 0;
+    for(var c=0;c<cols;c++){ if(cls.pairMode && c%2===1 && c!==cols-1) spacerCols++; }
+    var GAP = 10;
+    var SPACER_W = 22;
+    var totalGaps = cols + spacerCols - 1;
+
+    var availW = wrapW - spacerCols*SPACER_W - Math.max(0,totalGaps)*GAP;
+    var rawSeatW = Math.max(1, availW / cols);
+
+    var rowGaps = Math.max(0, rows - 1);
+    var availH = wrapH - rowGaps*GAP;
+    var rawSeatH = Math.max(1, availH / rows);
+
+    var seatW = Math.max(30, Math.min(rawSeatW, rawSeatH * 1.8));
+    var seatH = Math.max(26, Math.min(rawSeatH, rawSeatW * 1.6));
+
+    var fontSize = Math.max(11, Math.min(Math.min(seatW, seatH) * 0.26, 64));
+    var badgeFont = Math.max(9, fontSize * 0.4);
+
+    gridEl.style.setProperty("--seat-w", seatW + "px");
+    gridEl.style.setProperty("--seat-h", seatH + "px");
+    gridEl.style.setProperty("--seat-font", fontSize + "px");
+    gridEl.style.setProperty("--badge-font", badgeFont + "px");
+    gridEl.style.setProperty("--seat-gap", GAP + "px");
+    gridEl.style.setProperty("--spacer-w", SPACER_W + "px");
+  }
+
+  function resetSeatSizing(gridEl){
+    ["--seat-w","--seat-h","--seat-font","--badge-font","--seat-gap","--spacer-w"].forEach(function(p){
+      gridEl.style.removeProperty(p);
+    });
   }
 
   function render(){
@@ -1688,11 +1751,12 @@
 
     // ---- classroom grid ----
     var grid = buildGrid(cls);
+    var gridWrap = el("div", {class:"grid-wrap"}, [grid]);
 
     var classroom = el("div", {class:"classroom"}, [
       el("div", {class:"print-title", text: cls.name + " 자리 배치"}),
       el("div", {class:"blackboard", text:"칠 판"}),
-      grid
+      gridWrap
     ]);
 
     // ---- pool ----
@@ -1727,7 +1791,29 @@
     root.appendChild(header);
     root.appendChild(layout);
     root.appendChild(footer);
+
+    lastFitCls = cls;
+    lastGridWrap = gridWrap;
+    lastGrid = grid;
+    lastFitMode = isDesktopFit();
+    applySeatFit();
   }
+
+  var lastFitCls = null, lastGridWrap = null, lastGrid = null, lastFitMode = null;
+  function applySeatFit(){
+    if(!lastGridWrap || !lastGrid) return;
+    if(isDesktopFit()) fitSeatsToScreen(lastFitCls, lastGridWrap, lastGrid);
+    else resetSeatSizing(lastGrid);
+  }
+
+  var seatFitResizeTimer = null;
+  window.addEventListener("resize", function(){
+    clearTimeout(seatFitResizeTimer);
+    seatFitResizeTimer = setTimeout(function(){
+      if(isDesktopFit() !== lastFitMode) render();
+      else applySeatFit();
+    }, 150);
+  });
 
   save();
   render();
