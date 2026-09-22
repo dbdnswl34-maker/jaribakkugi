@@ -115,11 +115,6 @@
     70%{  transform:translate(0,0) scale(1.1) rotate(0deg); }
     100%{ transform:translate(0,0) scale(1) rotate(0deg); }
   }
-  @media (prefers-reduced-motion: reduce){
-    .seat.chaos{ animation:none; }
-    .seat.settle{ animation:none; }
-  }
-
   .reveal-btn{
     flex:0 0 auto; border:none; background:var(--point); color:var(--point-ink);
     padding:16px 34px; border-radius:20px; font-size:1.15rem; font-weight:400;
@@ -538,7 +533,6 @@
     var cx = centers.reduce(function(sum,c){ return sum + c.x; }, 0) / centers.length;
     var cy = centers.reduce(function(sum,c){ return sum + c.y; }, 0) / centers.length;
 
-    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var n = seatEls.length;
     function randomOtherIndex(self){
       if(n <= 1) return self;
@@ -563,11 +557,6 @@
       el.style.setProperty("--spin", ((Math.random() > 0.5 ? 1 : -1) * (5 + Math.random() * 6)) + "deg");
       el.classList.add("chaos");
     });
-
-    if(reduceMotion){
-      revealInProgress = false;
-      return;
-    }
 
     playGatherMotionSound(gen);
 

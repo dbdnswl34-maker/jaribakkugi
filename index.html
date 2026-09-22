@@ -133,9 +133,6 @@
     to{ opacity:1; transform:translateY(0) scale(1); }
   }
   .stage.class-switch-in{ animation:classSwitchIn .4s cubic-bezier(.16,1,.3,1); }
-  @media (prefers-reduced-motion: reduce){
-    .stage.class-switch-in{ animation:none; }
-  }
 
   .class-toast{
     position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-12px);
@@ -145,10 +142,6 @@
     transition:opacity .25s ease, transform .25s ease; white-space:nowrap;
   }
   .class-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-  @media (prefers-reduced-motion: reduce){
-    .class-toast{ transition:opacity .01s linear; transform:translateX(-50%); }
-    .class-toast.show{ transform:translateX(-50%); }
-  }
 
   .panel{
     background:var(--surface); border:2px solid var(--border); border-radius:22px;
