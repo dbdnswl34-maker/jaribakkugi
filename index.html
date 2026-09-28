@@ -457,7 +457,7 @@
   var armedGroup = null; // when set, seat/pool clicks toggle group membership instead of selecting
   var armedGender = null; // "f" | "m" | null — when set, seat clicks toggle a gender-only reservation instead of selecting
   var armedSeparate = null; // number | null — when set, seat/pool clicks toggle "keep apart" group membership instead of selecting
-  var sidebarTab = "roster"; // which sidebar tab is showing: "roster" | "layout" | "actions" | "saved"
+  var sidebarTab = "roster"; // which sidebar tab is showing: "roster" | "actions" | "group" | "saved"
   var justSwitchedClass = false; // true for exactly one render() right after switchClass(), to play the transition
 
   function save(){
@@ -1664,7 +1664,11 @@
       ]),
       el("button", {class:"action-btn", text:"성별 지정 초기화", onclick:clearAllGenderLocks}),
       el("button", {class:"action-btn", text:"🔓 전체 고정 해제", onclick:unlockAllSeats}),
-      el("button", {class:"action-btn danger", text:"전체 비우기 (자리 비움)", onclick:clearAllSeats}),
+      el("button", {class:"action-btn danger", text:"전체 비우기 (자리 비움)", onclick:clearAllSeats})
+    ]);
+
+    var toolsPanel = el("section", {class:"panel"}, [
+      el("h2", {text:"화면·출력"}),
       el("button", {class:"action-btn", text:"🖨 인쇄하기", onclick:doPrint}),
       el("button", {class:"action-btn", text:"🖥 학생 화면 새 창으로 열기", onclick:openStudentView}),
       el("p", {class:"hint", text:"새 창을 TV·프로젝터로 옮겨두면 이 화면에서 배치할 때마다 자동으로 함께 업데이트돼요."})
@@ -1753,8 +1757,8 @@
 
     var SIDEBAR_TABS = [
       {key:"roster", label:"👤 명단", panels:[rosterPanel, savedRosterPanel]},
-      {key:"layout", label:"🏫 배치·모둠", panels:[layoutPanel, groupPanel, separatePanel]},
-      {key:"actions", label:"🎲 자리배치", panels:[actionsPanel]},
+      {key:"actions", label:"🎲 자리배치", panels:[layoutPanel, separatePanel, actionsPanel]},
+      {key:"group", label:"👥 모둠", panels:[groupPanel, toolsPanel]},
       {key:"saved", label:"💾 저장·동기화", panels:[savedPanel, syncPanel]}
     ];
     if(SIDEBAR_TABS.every(function(t){ return t.key !== sidebarTab; })) sidebarTab = "roster";
