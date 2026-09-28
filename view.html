@@ -323,9 +323,10 @@
         if(pending) seatClasses.push("pending");
         if(g) seatClasses.push("has-group");
         var groupBadge = g ? el("span", {class:"seat-group", text:g+"모둠"}) : null;
+        var nameText = occupant ? (occupant.number ? occupant.number+"번 "+occupant.name : occupant.name) : "빈자리";
         var seatEl = el("div", {class:seatClasses.join(" ")}, [
           groupBadge,
-          el("span", {class:"seat-name", text: occupant ? occupant.name : "빈자리"})
+          el("span", {class:"seat-name", text: nameText})
         ]);
         if(g){
           seatEl.style.setProperty("--group-color", groupColor(g));
