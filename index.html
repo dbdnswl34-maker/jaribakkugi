@@ -465,6 +465,16 @@
   var sidebarTab = "roster"; // which sidebar tab is showing: "roster" | "actions" | "group" | "saved"
   var justSwitchedClass = false; // true for exactly one render() right after switchClass(), to play the transition
 
+  var TEACHER_FLIP_KEY = "jaribakkum_teacher_flip";
+  var teacherFlipped = false;
+  try{ teacherFlipped = localStorage.getItem(TEACHER_FLIP_KEY) === "1"; }catch(e){}
+
+  function toggleTeacherFlip(){
+    teacherFlipped = !teacherFlipped;
+    try{ localStorage.setItem(TEACHER_FLIP_KEY, teacherFlipped ? "1" : "0"); }catch(e){}
+    render();
+  }
+
   function save(){
     state.updatedAt = Date.now();
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
@@ -1485,18 +1495,30 @@
     return window.matchMedia("(min-width: 861px)").matches;
   }
 
-  function buildGrid(cls){
+  function buildGrid(cls, flip){
     var fitMode = isDesktopFit();
+    var rowTemplate = [];
     var colTemplateParts = [];
     for(var c=0;c<cls.cols;c++){
+      rowTemplate.push({type:"seat", col:c});
       colTemplateParts.push(fitMode ? "var(--seat-w, 108px)" : "minmax(104px,1fr)");
-      if(cls.pairMode && c%2===1 && c!==cls.cols-1) colTemplateParts.push(fitMode ? "var(--spacer-w, 22px)" : "22px");
+      if(cls.pairMode && c%2===1 && c!==cls.cols-1){
+        rowTemplate.push({type:"spacer"});
+        colTemplateParts.push(fitMode ? "var(--spacer-w, 22px)" : "22px");
+      }
+    }
+    if(flip){
+      rowTemplate = rowTemplate.slice().reverse();
+      colTemplateParts = colTemplateParts.slice().reverse();
     }
     var grid = el("div", {class:"grid"});
     grid.style.gridTemplateColumns = colTemplateParts.join(" ");
 
-    for(var r=0;r<cls.rows;r++){
-      for(var col=0; col<cls.cols; col++){
+    for(var rr=0; rr<cls.rows; rr++){
+      var r = flip ? (cls.rows-1-rr) : rr;
+      rowTemplate.forEach(function(item){
+        if(item.type === "spacer"){ grid.appendChild(el("div", {class:"spacer"})); return; }
+        var col = item.col;
         var idx = r*cls.cols + col;
         var occupantId = cls.seats[idx];
         var occupant = occupantId ? studentById(cls, occupantId) : null;
@@ -1536,10 +1558,7 @@
         ]);
         if(g) seatEl.style.setProperty("--group-color", groupColor(g));
         grid.appendChild(seatEl);
-        if(cls.pairMode && col%2===1 && col!==cls.cols-1){
-          grid.appendChild(el("div", {class:"spacer"}));
-        }
-      }
+      });
     }
     return grid;
   }
@@ -1773,7 +1792,9 @@
       el("h2", {text:"화면·출력"}),
       el("button", {class:"action-btn", text:"🖨 인쇄하기", onclick:doPrint}),
       el("button", {class:"action-btn", text:"🖥 학생 화면 새 창으로 열기", onclick:openStudentView}),
-      el("p", {class:"hint", text:"새 창을 TV·프로젝터로 옮겨두면 이 화면에서 배치할 때마다 자동으로 함께 업데이트돼요."})
+      el("p", {class:"hint", text:"새 창을 TV·프로젝터로 옮겨두면 이 화면에서 배치할 때마다 자동으로 함께 업데이트돼요."}),
+      el("button", {class:"action-btn", text:"🔄 화면 방향 전환", onclick:toggleTeacherFlip}),
+      el("p", {class:"hint", text:"칠판과 모니터 위치가 반대일 때, 이 화면의 자리 배치를 180도 뒤집어서 보여줘요."})
     ]);
 
     // ---- saved layouts ----
@@ -1885,13 +1906,14 @@
     ]);
 
     // ---- classroom grid ----
-    var grid = buildGrid(cls);
+    var grid = buildGrid(cls, teacherFlipped);
     var gridWrap = el("div", {class:"grid-wrap"}, [grid]);
+    var blackboardEl = el("div", {class:"blackboard", text:"칠 판"});
 
     var classroom = el("div", {class:"classroom"}, [
       el("div", {class:"print-title", text: cls.name + " 자리 배치"}),
-      el("div", {class:"blackboard", text:"칠 판"}),
-      gridWrap
+      teacherFlipped ? gridWrap : blackboardEl,
+      teacherFlipped ? blackboardEl : gridWrap
     ]);
 
     // ---- pool ----
