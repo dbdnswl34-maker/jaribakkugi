@@ -172,6 +172,11 @@
     flex:0 0 42px; width:42px; min-width:0; border:2px solid var(--border); background:var(--surface-2); color:var(--ink);
     border-radius:12px; padding:6px 4px; font-size:.85rem; text-align:center;
   }
+  .roster-tall-toggle{
+    flex:0 0 auto; display:flex; align-items:center; gap:3px; cursor:pointer;
+    font-family:'Noto Sans KR',sans-serif; font-size:.72rem; color:var(--ink-dim); white-space:nowrap;
+  }
+  .roster-tall-toggle input[type=checkbox]{ margin:0; cursor:pointer; }
   .roster-list button{
     border:none; background:transparent; color:var(--ink-dim); cursor:pointer; font-size:1rem; line-height:1;
     padding:4px 6px; border-radius:10px;
@@ -395,8 +400,8 @@
 
   function makeDefaultClass(name, girlCount, boyCount, cols, rows){
     var girls=[], boys=[];
-    for(var i=1;i<=girlCount;i++) girls.push({id:uid(), name:"여학생"+i, gender:"f", groupNo:0, keepApart:0, number:"", height:"", seatHistory:[]});
-    for(var j=1;j<=boyCount;j++) boys.push({id:uid(), name:"남학생"+j, gender:"m", groupNo:0, keepApart:0, number:"", height:"", seatHistory:[]});
+    for(var i=1;i<=girlCount;i++) girls.push({id:uid(), name:"여학생"+i, gender:"f", groupNo:0, keepApart:0, number:"", tall:false, seatHistory:[]});
+    for(var j=1;j<=boyCount;j++) boys.push({id:uid(), name:"남학생"+j, gender:"m", groupNo:0, keepApart:0, number:"", tall:false, seatHistory:[]});
     var seatCount = cols*rows;
     var seats = new Array(seatCount).fill(null);
     var lockedSeats = new Array(seatCount).fill(false);
@@ -629,7 +634,7 @@
       if(s.groupNo === undefined) s.groupNo = 0;
       if(s.keepApart === undefined) s.keepApart = 0;
       if(s.number === undefined) s.number = "";
-      if(s.height === undefined) s.height = "";
+      if(s.tall === undefined) s.tall = false;
       if(!s.seatHistory) s.seatHistory = [];
     });
     return c;
@@ -891,10 +896,9 @@
     save(); render();
   }
 
-  // like randomAssign, but orders students by height (shortest → front row,
-  // tallest → back row) instead of a pure shuffle. Students with no height
-  // entered are scattered in at random positions so they don't all pile up
-  // in the back. Row 0 is the front row (matches the "첫 행이 맨 앞줄" convention).
+  // like randomAssign, but keeps students checked "키↑" (tall) toward the back
+  // rows and everyone else toward the front, instead of a pure shuffle.
+  // Row 0 is the front row (matches the "첫 행이 맨 앞줄" convention).
   function heightAssign(mode){
     var cls = currentClass();
     var forbiddenMap = buildForbiddenMap(cls);
@@ -948,14 +952,8 @@
     }
     didAssign = true;
 
-    var withHeight = pool.filter(function(s){ return parseFloat(s.height) > 0; })
-      .sort(function(a,b){ return parseFloat(a.height) - parseFloat(b.height); });
-    var withoutHeight = shuffle(pool.filter(function(s){ return !(parseFloat(s.height) > 0); }));
-    var ordered = withHeight.slice();
-    withoutHeight.forEach(function(s){
-      var pos = Math.floor(Math.random() * (ordered.length + 1));
-      ordered.splice(pos, 0, s);
-    });
+    var ordered = shuffle(pool.filter(function(s){ return !s.tall; }))
+      .concat(shuffle(pool.filter(function(s){ return !!s.tall; })));
 
     var rowsMap = {};
     seatIdx.forEach(function(idx){
@@ -1131,7 +1129,7 @@
     var cls = currentClass();
     var list = gender==="f" ? cls.girls : cls.boys;
     var label = gender==="f" ? "여학생" : "남학생";
-    list.push({id:uid(), name:label+(list.length+1), gender:gender, groupNo:0, keepApart:0, number:"", height:"", seatHistory:[]});
+    list.push({id:uid(), name:label+(list.length+1), gender:gender, groupNo:0, keepApart:0, number:"", tall:false, seatHistory:[]});
     save(); render();
   }
 
@@ -1161,11 +1159,11 @@
     save();
   }
 
-  function setStudentHeight(gender, id, value){
+  function setStudentTall(gender, id, checked){
     var cls = currentClass();
     var list = gender==="f" ? cls.girls : cls.boys;
     var s = list.find(function(x){return x.id===id;});
-    if(s) s.height = value.trim().slice(0, 5);
+    if(s) s.tall = checked;
     save();
   }
 
@@ -1341,7 +1339,7 @@
         name = c;
       });
       if(!name || name === "이름" || name === "성명" || name === "학생명") return;
-      var rec = { id:uid(), name:name, gender:gender || "f", groupNo:0, keepApart:0, number:number, height:"", seatHistory:[] };
+      var rec = { id:uid(), name:name, gender:gender || "f", groupNo:0, keepApart:0, number:number, tall:false, seatHistory:[] };
       if(rec.gender === "f") girls.push(rec); else boys.push(rec);
     });
     return { girls:girls, boys:boys };
@@ -1638,15 +1636,15 @@
         numberInput.value = s.number || "";
         numberInput.placeholder = "번호";
         numberInput.addEventListener("change", function(e){ setStudentNumber(gender, s.id, e.target.value); });
-        var heightInput = el("input", {type:"text", inputmode:"numeric", class:"roster-number-input", title:"키(cm) — 자리 배치 시 앞뒤 줄 배정에 참고돼요"});
-        heightInput.value = s.height || "";
-        heightInput.placeholder = "키";
-        heightInput.addEventListener("change", function(e){ setStudentHeight(gender, s.id, e.target.value); });
+        var tallCheck = el("input", {type:"checkbox", class:"roster-tall-check"});
+        tallCheck.checked = !!s.tall;
+        tallCheck.addEventListener("change", function(e){ setStudentTall(gender, s.id, e.target.checked); });
+        var tallLabel = el("label", {class:"roster-tall-toggle", title:"키가 큰 편인 학생 표시 — '키 고려 배치' 시 뒷줄로 배치돼요"}, [tallCheck, el("span", {text:"키↑"})]);
         var input = el("input", {type:"text", value:""});
         input.value = s.name;
         input.addEventListener("input", function(e){ renameStudent(gender, s.id, e.target.value); });
         var removeBtn = el("button", {text:"×", onclick:function(){ removeStudent(gender, s.id); }});
-        ul.appendChild(el("li", {}, [numberInput, heightInput, input, removeBtn]));
+        ul.appendChild(el("li", {}, [numberInput, input, tallLabel, removeBtn]));
       });
       var addBtn = el("button", {class:"add-student-btn", text:"+ "+label+" 추가", onclick:function(){ addStudent(gender); }});
       return el("div", {class:"roster-col "+(gender==="f"?"girls":"boys")}, [
@@ -1657,7 +1655,7 @@
 
     var rosterPanel = el("section", {class:"panel"}, [
       el("h2", {text:"학생 명단"}),
-      el("p", {class:"hint", text:"이름을 눌러 바로 수정하세요. 앞 두 칸에는 출석 번호와 키(cm)를 입력할 수 있어요 (키를 넣으면 '키 고려 배치' 시 참고돼요). 예시 이름은 자유롭게 실제 학생 이름으로 바꿀 수 있어요."}),
+      el("p", {class:"hint", text:"이름을 눌러 바로 수정하세요. 앞 칸에는 출석 번호를 입력할 수 있고, '키↑'를 체크하면 키가 큰 편인 학생으로 표시돼요 ('키 고려 배치' 시 뒷줄에 배치). 예시 이름은 자유롭게 실제 학생 이름으로 바꿀 수 있어요."}),
       el("button", {class:"action-btn", text:"📊 엑셀 파일로 명단 올리기", onclick:triggerRosterExcelImport}),
       el("p", {class:"hint", text:"한 행에 이름 1개씩, 번호와 성별(여/남) 칸이 있으면 자동으로 같이 읽어요. 올리면 지금 명단을 통째로 바꿔요."}),
       importExcelInput,
@@ -1760,7 +1758,7 @@
       el("label", {class:"switch-row"}, [altCheck, el("span",{text:"남녀 짝 교차 배치"})]),
       el("button", {class:"action-btn", text:"📏 키 고려 전체 배치", onclick:function(){ heightAssign("all"); }}),
       el("button", {class:"action-btn", text:"📏 키 고려 빈자리만 배치", onclick:function(){ heightAssign("empty"); }}),
-      el("p", {class:"hint", text:"학생 명단에 키(cm)를 입력해두면, 이 버튼은 키가 작은 학생을 앞줄에, 큰 학생을 뒷줄에 배치해요. 키를 입력 안 한 학생은 무작위 위치에 섞여 들어가요."}),
+      el("p", {class:"hint", text:"학생 명단에서 '키↑'를 체크해두면, 이 버튼은 체크 안 한 학생을 앞줄에, 체크한 학생을 뒷줄에 배치해요."}),
       el("p", {class:"hint", text:"♀/♂ 버튼을 누른 뒤 자리를 클릭하면 그 자리는 항상 그 성별만 랜덤 배치돼요 (미리 지정 가능, 빈자리도 가능)."}),
       el("div", {class:"gender-arm-row"}, [
         el("button", {class:"gender-arm-btn f"+(armedGender==="f"?" armed":""), type:"button", text:"♀ 여자\n자리 지정", onclick:function(){ toggleArmGender("f"); }}),
