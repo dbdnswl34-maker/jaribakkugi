@@ -1643,6 +1643,7 @@
         el("button", {class:"icon-btn", text:"반 삭제", onclick:deleteClass}),
         el("button", {class:"icon-btn", title:"모든 반의 배치를 파일로 저장", text:"⬇ 내보내기", onclick:exportState}),
         el("button", {class:"icon-btn", title:"파일에서 배치 불러오기", text:"⬆ 불러오기", onclick:triggerImport}),
+        el("button", {class:"icon-btn", title:"칠판과 모니터 위치가 반대일 때, 자리 배치를 180도 뒤집어서 보여줘요", text:"🔄 화면 방향 전환", onclick:toggleTeacherFlip}),
         importInput
       ])
     ]);
@@ -1792,9 +1793,7 @@
       el("h2", {text:"화면·출력"}),
       el("button", {class:"action-btn", text:"🖨 인쇄하기", onclick:doPrint}),
       el("button", {class:"action-btn", text:"🖥 학생 화면 새 창으로 열기", onclick:openStudentView}),
-      el("p", {class:"hint", text:"새 창을 TV·프로젝터로 옮겨두면 이 화면에서 배치할 때마다 자동으로 함께 업데이트돼요."}),
-      el("button", {class:"action-btn", text:"🔄 화면 방향 전환", onclick:toggleTeacherFlip}),
-      el("p", {class:"hint", text:"칠판과 모니터 위치가 반대일 때, 이 화면의 자리 배치를 180도 뒤집어서 보여줘요."})
+      el("p", {class:"hint", text:"새 창을 TV·프로젝터로 옮겨두면 이 화면에서 배치할 때마다 자동으로 함께 업데이트돼요."})
     ]);
 
     // ---- saved layouts ----
