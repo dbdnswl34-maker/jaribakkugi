@@ -178,6 +178,259 @@
     return null;
   }
 
+
+  // ---- "다시 섞기" (reshuffle) support: mirrors the teacher screen's random/
+  // height-aware seat assignment so that pressing the button here on the
+  // student view produces the same kind of arrangement the teacher last used,
+  // while always leaving 🔒-locked seats untouched. ----
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+  function shuffle(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t=a[i]; a[i]=a[j]; a[j]=t;
+    }
+    return a;
+  }
+
+  function saveState(state){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  function allStudentsRS(cls){
+    return cls.girls.concat(cls.boys);
+  }
+
+  var SEAT_HISTORY_CAP_RS = 3;
+
+  function buildForbiddenMapRS(cls){
+    var map = {};
+    allStudentsRS(cls).forEach(function(s){
+      if(s.seatHistory && s.seatHistory.length){ map[s.id] = new Set(s.seatHistory); }
+    });
+    return map;
+  }
+
+  function recordSeatHistoryForSeatsRS(cls, seatIndices){
+    seatIndices.forEach(function(ix){
+      var sid = cls.seats[ix];
+      if(!sid) return;
+      var s = studentById(cls, sid);
+      if(!s) return;
+      if(!s.seatHistory) s.seatHistory = [];
+      s.seatHistory.push(ix);
+      if(s.seatHistory.length > SEAT_HISTORY_CAP_RS) s.seatHistory = s.seatHistory.slice(-SEAT_HISTORY_CAP_RS);
+    });
+  }
+
+  function fixForbiddenSeatsRS(cls, seatIdx, forbiddenMap){
+    if(seatIdx.length < 2) return;
+    for(var pass=0; pass<4; pass++){
+      var violations = seatIdx.filter(function(ix){
+        var sid = cls.seats[ix];
+        return sid && forbiddenMap[sid] && forbiddenMap[sid].has(ix);
+      });
+      if(violations.length === 0) return;
+      var progressed = false;
+      violations.forEach(function(ix){
+        var sid = cls.seats[ix];
+        if(!(sid && forbiddenMap[sid] && forbiddenMap[sid].has(ix))) return;
+        var others = shuffle(seatIdx.filter(function(o){ return o !== ix; }));
+        for(var ci=0; ci<others.length; ci++){
+          var pIdx = others[ci];
+          var pSid = cls.seats[pIdx];
+          var sidBadAtP = forbiddenMap[sid] && forbiddenMap[sid].has(pIdx);
+          var pSidBadAtIdx = pSid && forbiddenMap[pSid] && forbiddenMap[pSid].has(ix);
+          if(!sidBadAtP && !pSidBadAtIdx){
+            cls.seats[ix] = pSid;
+            cls.seats[pIdx] = sid;
+            progressed = true;
+            break;
+          }
+        }
+      });
+      if(!progressed) return;
+    }
+  }
+
+  function buildKeepApartMapRS(cls){
+    var map = {};
+    allStudentsRS(cls).forEach(function(s){ if(s.keepApart) map[s.id] = s.keepApart; });
+    return map;
+  }
+
+  function seatNeighborsRS(ix, cols, total){
+    var col = ix % cols;
+    var out = [];
+    if(col > 0) out.push(ix-1);
+    if(col < cols-1) out.push(ix+1);
+    if(ix-cols >= 0) out.push(ix-cols);
+    if(ix+cols < total) out.push(ix+cols);
+    return out;
+  }
+
+  function hasKeepApartViolationRS(cls, ix, sid, keepApartMap){
+    if(!sid || !keepApartMap[sid]) return false;
+    var neighbors = seatNeighborsRS(ix, cls.cols, cls.seats.length);
+    for(var i=0;i<neighbors.length;i++){
+      var nSid = cls.seats[neighbors[i]];
+      if(nSid && keepApartMap[nSid] === keepApartMap[sid]) return true;
+    }
+    return false;
+  }
+
+  function fixKeepApartViolationsRS(cls, seatIdx, keepApartMap){
+    if(seatIdx.length < 2) return;
+    for(var pass=0; pass<6; pass++){
+      var violations = seatIdx.filter(function(ix){ return hasKeepApartViolationRS(cls, ix, cls.seats[ix], keepApartMap); });
+      if(violations.length === 0) return;
+      var progressed = false;
+      violations.forEach(function(ix){
+        var sid = cls.seats[ix];
+        if(!hasKeepApartViolationRS(cls, ix, sid, keepApartMap)) return;
+        var others = shuffle(seatIdx.filter(function(o){ return o !== ix; }));
+        for(var ci=0; ci<others.length; ci++){
+          var pIdx = others[ci];
+          var pSid = cls.seats[pIdx];
+          cls.seats[ix] = pSid; cls.seats[pIdx] = sid;
+          var stillBad = hasKeepApartViolationRS(cls, ix, pSid, keepApartMap) || hasKeepApartViolationRS(cls, pIdx, sid, keepApartMap);
+          if(!stillBad){ progressed = true; break; }
+          cls.seats[ix] = sid; cls.seats[pIdx] = pSid;
+        }
+      });
+      if(!progressed) return;
+    }
+  }
+
+  function computeGroupsRS(seatIdxSet, cols, rows, pairMode){
+    var groups = [];
+    for(var r=0;r<rows;r++){
+      for(var c=0;c<cols;c+=(pairMode?2:1)){
+        var i1 = r*cols+c;
+        var i2 = (pairMode && c+1<cols) ? r*cols+c+1 : null;
+        var has1 = seatIdxSet.has(i1);
+        var has2 = i2!==null && seatIdxSet.has(i2);
+        if(has1 && has2) groups.push([i1,i2]);
+        else if(has1) groups.push([i1]);
+        else if(has2) groups.push([i2]);
+      }
+    }
+    return groups;
+  }
+
+  // Re-run a shuffle from the student view itself. Always skips 🔒-locked
+  // seats (and whoever sits in them) — exactly like the teacher screen's
+  // "전체 랜덤 배치". If the teacher's last shuffle on this class used
+  // "키 고려" (height) or "남녀 짝 교차 배치", the same option is reused here,
+  // and seats pinned to a gender (♀/♂) are still honored.
+  function reshuffleSeats(){
+    var state = loadState();
+    var cls = currentClass(state);
+    if(!cls || !cls.seats || !cls.seats.length) return;
+    primeAudio();
+
+    var forbiddenMap = buildForbiddenMapRS(cls);
+    var keepApartMap = buildKeepApartMapRS(cls);
+    var lockedIdx = {};
+    var lockedStudentIds = {};
+    for(var lp=0;lp<cls.seats.length;lp++){
+      if(cls.lockedSeats && cls.lockedSeats[lp]){
+        lockedIdx[lp] = true;
+        if(cls.seats[lp]) lockedStudentIds[cls.seats[lp]] = true;
+      }
+    }
+
+    var seatIdx = [];
+    for(var i=0;i<cls.seats.length;i++) if(!lockedIdx[i]) seatIdx.push(i);
+    var pool = allStudentsRS(cls).filter(function(s){ return !lockedStudentIds[s.id]; });
+    if(seatIdx.length === 0 || pool.length === 0) return;
+    for(var z=0;z<cls.seats.length;z++){ if(!lockedIdx[z]) cls.seats[z] = null; }
+
+    var seatGenderLock = cls.seatGenderLock || [];
+    var girlLockSeats = seatIdx.filter(function(ix){ return seatGenderLock[ix] === "f"; });
+    var boyLockSeats = seatIdx.filter(function(ix){ return seatGenderLock[ix] === "m"; });
+    var freeSeats = seatIdx.filter(function(ix){ return !seatGenderLock[ix]; });
+
+    if(girlLockSeats.length || boyLockSeats.length){
+      var girlsForLocks = shuffle(pool.filter(function(s){ return s.gender === "f"; }));
+      var boysForLocks = shuffle(pool.filter(function(s){ return s.gender === "m"; }));
+      girlLockSeats.forEach(function(ix){ if(girlsForLocks.length){ cls.seats[ix] = girlsForLocks.pop().id; } });
+      boyLockSeats.forEach(function(ix){ if(boysForLocks.length){ cls.seats[ix] = boysForLocks.pop().id; } });
+      fixForbiddenSeatsRS(cls, girlLockSeats, forbiddenMap);
+      fixForbiddenSeatsRS(cls, boyLockSeats, forbiddenMap);
+      fixKeepApartViolationsRS(cls, girlLockSeats, keepApartMap);
+      fixKeepApartViolationsRS(cls, boyLockSeats, keepApartMap);
+      var placedIds = {};
+      girlLockSeats.concat(boyLockSeats).forEach(function(ix){ if(cls.seats[ix]) placedIds[cls.seats[ix]] = true; });
+      pool = pool.filter(function(s){ return !placedIds[s.id]; });
+    }
+    seatIdx = freeSeats;
+
+    if(seatIdx.length > 0 && pool.length > 0){
+      if(cls.lastShuffleMode === "height"){
+        var ordered = shuffle(pool.filter(function(s){ return !s.tall; }))
+          .concat(shuffle(pool.filter(function(s){ return !!s.tall; })));
+        var rowsMap = {};
+        seatIdx.forEach(function(ix){
+          var r = Math.floor(ix / cls.cols);
+          if(!rowsMap[r]) rowsMap[r] = [];
+          rowsMap[r].push(ix);
+        });
+        var rowNums = Object.keys(rowsMap).map(Number).sort(function(a,b){ return a-b; });
+        var cursor = 0;
+        rowNums.forEach(function(r){
+          var seatsInRow = shuffle(rowsMap[r]);
+          seatsInRow.forEach(function(ix){
+            if(cursor < ordered.length){ cls.seats[ix] = ordered[cursor].id; cursor++; }
+          });
+        });
+      } else if(cls.lastShuffleAlternate){
+        var seatSet = new Set(seatIdx);
+        var groups = computeGroupsRS(seatSet, cls.cols, cls.rows, !!cls.pairMode);
+        var girlsQ = shuffle(pool.filter(function(s){return s.gender==="f";}));
+        var boysQ = shuffle(pool.filter(function(s){return s.gender==="m";}));
+        groups.forEach(function(g){
+          if(g.length === 2){
+            var a=null,b=null;
+            if(girlsQ.length>0 && boysQ.length>0){ a=girlsQ.pop(); b=boysQ.pop(); }
+            else if(girlsQ.length>=2){ a=girlsQ.pop(); b=girlsQ.pop(); }
+            else if(boysQ.length>=2){ a=boysQ.pop(); b=boysQ.pop(); }
+            else if(girlsQ.length===1 && boysQ.length===0){ a=girlsQ.pop(); }
+            else if(boysQ.length===1 && girlsQ.length===0){ a=boysQ.pop(); }
+            var seatsShuffled = shuffle(g);
+            if(a) cls.seats[seatsShuffled[0]] = a.id;
+            if(b) cls.seats[seatsShuffled[1]] = b.id;
+          } else {
+            var pick = null;
+            if(girlsQ.length > boysQ.length) pick = girlsQ.pop();
+            else if(boysQ.length > 0) pick = boysQ.pop();
+            else if(girlsQ.length > 0) pick = girlsQ.pop();
+            if(pick) cls.seats[g[0]] = pick.id;
+          }
+        });
+      } else {
+        var shuffledPool = shuffle(pool);
+        for(var n=0;n<seatIdx.length && n<shuffledPool.length;n++){
+          cls.seats[seatIdx[n]] = shuffledPool[n].id;
+        }
+      }
+      fixForbiddenSeatsRS(cls, seatIdx, forbiddenMap);
+      fixKeepApartViolationsRS(cls, seatIdx, keepApartMap);
+    }
+
+    recordSeatHistoryForSeatsRS(cls, girlLockSeats.concat(boyLockSeats, seatIdx));
+    cls.revealToken = uid();
+    saveState(state);
+
+    // show it right away with the same "desks flying around" animation used
+    // when a student presses the reveal button, instead of waiting for
+    // someone to press "자리 결과 확인하기"
+    revealState = { key: cls.id + "|" + cls.revealToken, revealed: true };
+    revealGen++; revealInProgress = false;
+    paintSeats(cls, "revealing");
+  }
+
   var GROUP_COLORS = ["#e0447f", "#d4a017", "#2f9e5c", "#3f6fd1", "#5e35b1"]; // 핑크,노랑,초록,파랑,보라 (모두 진하게)
   var GROUP_TEXT_COLORS = ["#ffffff", "#3a2a1f", "#ffffff", "#ffffff", "#ffffff"]; // readable text per group color above
   function groupColor(n){
@@ -389,7 +642,11 @@
   function toggleViewMode(){
     viewMode = (viewMode === "groups") ? "seats" : "groups";
     try{ localStorage.setItem(VIEW_MODE_KEY, viewMode); }catch(e){}
-    revealState = { key: undefined, revealed: true };
+    // NOTE: do NOT reset revealState here — doing so made every switch back from
+    // the group view look like a brand-new (unrevealed) seat arrangement, forcing
+    // the "자리 결과 확인하기" button to reappear even though it was already revealed.
+    // revealGen/revealInProgress are still reset so an in-flight shuffle animation
+    // is safely interrupted when the user navigates away mid-animation.
     revealGen++; revealInProgress = false;
     checkForUpdate();
   }
@@ -400,6 +657,9 @@
     ];
     if(viewMode === "seats"){
       rightButtons.push(el("button", {class:"ghost-btn", text:"🔄 화면 방향 전환", onclick:toggleFlip}));
+      if(cls && cls.seats && cls.seats.length){
+        rightButtons.push(el("button", {class:"ghost-btn", text:"🔀 다시 섞기", onclick:reshuffleSeats}));
+      }
     }
     rightButtons.push(el("button", {class:"ghost-btn", text:"↻ 새로고침", onclick:checkForUpdate}));
     return el("div", {class:"topbar"}, [

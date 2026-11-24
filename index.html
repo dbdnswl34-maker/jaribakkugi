@@ -815,6 +815,8 @@
 
   function randomAssign(mode, alternate){
     var cls = currentClass();
+    cls.lastShuffleMode = "random";
+    cls.lastShuffleAlternate = !!alternate;
     var forbiddenMap = buildForbiddenMap(cls);
     var keepApartMap = buildKeepApartMap(cls);
     var lockedIdx = {};
@@ -911,6 +913,7 @@
   // Row 0 is the front row (matches the "첫 행이 맨 앞줄" convention).
   function heightAssign(mode){
     var cls = currentClass();
+    cls.lastShuffleMode = "height";
     var forbiddenMap = buildForbiddenMap(cls);
     var keepApartMap = buildKeepApartMap(cls);
     var lockedIdx = {};
