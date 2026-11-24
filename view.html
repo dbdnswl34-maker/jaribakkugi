@@ -353,14 +353,45 @@
     var freeSeats = seatIdx.filter(function(ix){ return !seatGenderLock[ix]; });
 
     if(girlLockSeats.length || boyLockSeats.length){
-      var girlsForLocks = shuffle(pool.filter(function(s){ return s.gender === "f"; }));
-      var boysForLocks = shuffle(pool.filter(function(s){ return s.gender === "m"; }));
-      girlLockSeats.forEach(function(ix){ if(girlsForLocks.length){ cls.seats[ix] = girlsForLocks.pop().id; } });
-      boyLockSeats.forEach(function(ix){ if(boysForLocks.length){ cls.seats[ix] = boysForLocks.pop().id; } });
-      fixForbiddenSeatsRS(cls, girlLockSeats, forbiddenMap);
-      fixForbiddenSeatsRS(cls, boyLockSeats, forbiddenMap);
-      fixKeepApartViolationsRS(cls, girlLockSeats, keepApartMap);
-      fixKeepApartViolationsRS(cls, boyLockSeats, keepApartMap);
+      if(cls.lastShuffleMode === "height"){
+        var sortByRow = function(arr){
+          return arr.slice().sort(function(a,b){
+            var ra = Math.floor(a / cls.cols), rb = Math.floor(b / cls.cols);
+            return ra !== rb ? ra - rb : (Math.random() - 0.5);
+          });
+        };
+        var gLockSorted = sortByRow(girlLockSeats);
+        var bLockSorted = sortByRow(boyLockSeats);
+        var gShort = shuffle(pool.filter(function(s){ return s.gender === "f" && !s.tall; }));
+        var gTall = shuffle(pool.filter(function(s){ return s.gender === "f" && !!s.tall; }));
+        var girlsForLocks = gShort.concat(gTall);
+        var bShort = shuffle(pool.filter(function(s){ return s.gender === "m" && !s.tall; }));
+        var bTall = shuffle(pool.filter(function(s){ return s.gender === "m" && !!s.tall; }));
+        var boysForLocks = bShort.concat(bTall);
+        var gShortSeats = gLockSorted.slice(0, gShort.length);
+        var gTallSeats = gLockSorted.slice(gShort.length);
+        var bShortSeats = bLockSorted.slice(0, bShort.length);
+        var bTallSeats = bLockSorted.slice(bShort.length);
+        gLockSorted.forEach(function(ix, idx){ if(idx < girlsForLocks.length){ cls.seats[ix] = girlsForLocks[idx].id; } });
+        bLockSorted.forEach(function(ix, idx){ if(idx < boysForLocks.length){ cls.seats[ix] = boysForLocks[idx].id; } });
+        fixForbiddenSeatsRS(cls, gShortSeats, forbiddenMap);
+        fixForbiddenSeatsRS(cls, gTallSeats, forbiddenMap);
+        fixForbiddenSeatsRS(cls, bShortSeats, forbiddenMap);
+        fixForbiddenSeatsRS(cls, bTallSeats, forbiddenMap);
+        fixKeepApartViolationsRS(cls, gShortSeats, keepApartMap);
+        fixKeepApartViolationsRS(cls, gTallSeats, keepApartMap);
+        fixKeepApartViolationsRS(cls, bShortSeats, keepApartMap);
+        fixKeepApartViolationsRS(cls, bTallSeats, keepApartMap);
+      } else {
+        var girlsForLocks = shuffle(pool.filter(function(s){ return s.gender === "f"; }));
+        var boysForLocks = shuffle(pool.filter(function(s){ return s.gender === "m"; }));
+        girlLockSeats.forEach(function(ix){ if(girlsForLocks.length){ cls.seats[ix] = girlsForLocks.pop().id; } });
+        boyLockSeats.forEach(function(ix){ if(boysForLocks.length){ cls.seats[ix] = boysForLocks.pop().id; } });
+        fixForbiddenSeatsRS(cls, girlLockSeats, forbiddenMap);
+        fixForbiddenSeatsRS(cls, boyLockSeats, forbiddenMap);
+        fixKeepApartViolationsRS(cls, girlLockSeats, keepApartMap);
+        fixKeepApartViolationsRS(cls, boyLockSeats, keepApartMap);
+      }
       var placedIds = {};
       girlLockSeats.concat(boyLockSeats).forEach(function(ix){ if(cls.seats[ix]) placedIds[cls.seats[ix]] = true; });
       pool = pool.filter(function(s){ return !placedIds[s.id]; });
@@ -368,9 +399,12 @@
     seatIdx = freeSeats;
 
     if(seatIdx.length > 0 && pool.length > 0){
+      var heightShortSeats = null;
+      var heightTallSeats = null;
       if(cls.lastShuffleMode === "height"){
-        var ordered = shuffle(pool.filter(function(s){ return !s.tall; }))
-          .concat(shuffle(pool.filter(function(s){ return !!s.tall; })));
+        var shortPool = shuffle(pool.filter(function(s){ return !s.tall; }));
+        var tallPool = shuffle(pool.filter(function(s){ return !!s.tall; }));
+        var ordered = shortPool.concat(tallPool);
         var rowsMap = {};
         seatIdx.forEach(function(ix){
           var r = Math.floor(ix / cls.cols);
@@ -379,10 +413,17 @@
         });
         var rowNums = Object.keys(rowsMap).map(Number).sort(function(a,b){ return a-b; });
         var cursor = 0;
+        heightShortSeats = [];
+        heightTallSeats = [];
         rowNums.forEach(function(r){
           var seatsInRow = shuffle(rowsMap[r]);
           seatsInRow.forEach(function(ix){
-            if(cursor < ordered.length){ cls.seats[ix] = ordered[cursor].id; cursor++; }
+            if(cursor < ordered.length){
+              cls.seats[ix] = ordered[cursor].id;
+              if(cursor < shortPool.length) heightShortSeats.push(ix);
+              else heightTallSeats.push(ix);
+              cursor++;
+            }
           });
         });
       } else if(cls.lastShuffleAlternate){
@@ -415,8 +456,15 @@
           cls.seats[seatIdx[n]] = shuffledPool[n].id;
         }
       }
-      fixForbiddenSeatsRS(cls, seatIdx, forbiddenMap);
-      fixKeepApartViolationsRS(cls, seatIdx, keepApartMap);
+      if(cls.lastShuffleMode === "height" && heightShortSeats && heightTallSeats){
+        fixForbiddenSeatsRS(cls, heightShortSeats, forbiddenMap);
+        fixForbiddenSeatsRS(cls, heightTallSeats, forbiddenMap);
+        fixKeepApartViolationsRS(cls, heightShortSeats, keepApartMap);
+        fixKeepApartViolationsRS(cls, heightTallSeats, keepApartMap);
+      } else {
+        fixForbiddenSeatsRS(cls, seatIdx, forbiddenMap);
+        fixKeepApartViolationsRS(cls, seatIdx, keepApartMap);
+      }
     }
 
     recordSeatHistoryForSeatsRS(cls, girlLockSeats.concat(boyLockSeats, seatIdx));
