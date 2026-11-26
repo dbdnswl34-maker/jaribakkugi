@@ -942,8 +942,15 @@
     var freeSeats = seatIdx.filter(function(idx){ return !cls.seatGenderLock[idx]; });
 
     if(girlLockSeats.length || boyLockSeats.length){
-      var girlsForLocks = shuffle(pool.filter(function(s){ return s.gender === "f"; }));
-      var boysForLocks = shuffle(pool.filter(function(s){ return s.gender === "m"; }));
+      // 성별 지정 자리도 키를 반영: 뒷줄 자리부터 키↑ 학생이 앉도록 정렬
+      // (pop()은 배열 끝에서 꺼내므로 키↑ 학생을 뒤에 두고, 자리는 뒷줄이 앞에 오게 정렬)
+      function byRowDesc(a, b){ return Math.floor(b / cls.cols) - Math.floor(a / cls.cols); }
+      girlLockSeats.sort(byRowDesc);
+      boyLockSeats.sort(byRowDesc);
+      var girlsForLocks = shuffle(pool.filter(function(s){ return s.gender === "f" && !s.tall; }))
+        .concat(shuffle(pool.filter(function(s){ return s.gender === "f" && s.tall; })));
+      var boysForLocks = shuffle(pool.filter(function(s){ return s.gender === "m" && !s.tall; }))
+        .concat(shuffle(pool.filter(function(s){ return s.gender === "m" && s.tall; })));
       girlLockSeats.forEach(function(idx){ if(girlsForLocks.length){ cls.seats[idx] = girlsForLocks.pop().id; didAssign = true; } });
       boyLockSeats.forEach(function(idx){ if(boysForLocks.length){ cls.seats[idx] = boysForLocks.pop().id; didAssign = true; } });
       fixForbiddenSeats(cls, girlLockSeats, forbiddenMap);
@@ -983,8 +990,19 @@
       });
     });
 
-    fixForbiddenSeats(cls, seatIdx, forbiddenMap);
-    fixKeepApartViolations(cls, seatIdx, keepApartMap);
+    // 키 그룹이 섞이지 않도록, 같은 그룹(키↑ / 나머지) 자리끼리만 맞바꾸기
+    var shortSeatIdx = seatIdx.filter(function(idx){
+      var s = cls.seats[idx] ? studentById(cls, cls.seats[idx]) : null;
+      return s && !s.tall;
+    });
+    var tallSeatIdx = seatIdx.filter(function(idx){
+      var s = cls.seats[idx] ? studentById(cls, cls.seats[idx]) : null;
+      return !s || s.tall;
+    });
+    fixForbiddenSeats(cls, shortSeatIdx, forbiddenMap);
+    fixForbiddenSeats(cls, tallSeatIdx, forbiddenMap);
+    fixKeepApartViolations(cls, shortSeatIdx, keepApartMap);
+    fixKeepApartViolations(cls, tallSeatIdx, keepApartMap);
     recordSeatHistoryForSeats(cls, girlLockSeats.concat(boyLockSeats, seatIdx));
     cls.revealToken = uid();
     save(); render();
