@@ -1274,7 +1274,8 @@
       cols: cls.cols,
       rows: cls.rows,
       pairMode: cls.pairMode,
-      seats: cls.seats.slice()
+      seats: cls.seats.slice(),
+      groups: allStudents(cls).reduce(function(m, st){ m[st.id] = { groupNo: st.groupNo || 0, keepApart: st.keepApart || 0 }; return m; }, {})
     });
     save(); render();
   }
@@ -1293,6 +1294,12 @@
     var restored = layout.seats.map(function(sid){ return (sid && validIds[sid]) ? sid : null; });
     for(var i=0;i<cls.seats.length;i++){ cls.seats[i] = restored[i] || null; }
     cls.lockedSeats = new Array(cls.seats.length).fill(false);
+    if(layout.groups){
+      allStudents(cls).forEach(function(st){
+        var g = layout.groups[st.id];
+        if(g){ st.groupNo = g.groupNo || 0; st.keepApart = g.keepApart || 0; }
+      });
+    }
     var occupiedIdx = [];
     for(var oi=0;oi<cls.seats.length;oi++){ if(cls.seats[oi]) occupiedIdx.push(oi); }
     recordSeatHistoryForSeats(cls, occupiedIdx);
