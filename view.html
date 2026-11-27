@@ -129,16 +129,17 @@
   .empty-state h1{ font-size:1.4rem; margin-bottom:12px; color:var(--ink); }
 
   .groups-wrap{
-    display:flex; flex-wrap:wrap; gap:24px; justify-content:center; align-content:center;
+    display:flex; flex-direction:column; gap:28px; align-items:center; justify-content:center;
     width:fit-content; max-width:100%; margin:0 auto; transform-origin:center center;
   }
+  .groups-row{ display:flex; flex-wrap:nowrap; gap:28px; justify-content:center; }
   .group-card{
-    background:var(--surface); border:2px solid var(--border); border-left:10px solid var(--group-color, var(--border));
-    border-radius:24px; padding:24px 30px; min-width:230px; box-shadow:var(--shadow);
+    background:var(--surface); border:2px solid var(--border); border-left:12px solid var(--group-color, var(--border));
+    border-radius:28px; padding:30px 38px; min-width:360px; box-shadow:var(--shadow);
   }
-  .group-title{ font-family:'Jua','Noto Sans KR',sans-serif; font-size:1.7rem; margin-bottom:14px; }
-  .group-members{ display:flex; flex-wrap:wrap; gap:10px; max-width:340px; }
-  .member-chip{ border:2px solid var(--border); border-radius:16px; padding:7px 18px; font-size:1.2rem; font-weight:700; background:var(--desk-empty); }
+  .group-title{ font-family:'Jua','Noto Sans KR',sans-serif; font-size:2.6rem; margin-bottom:18px; }
+  .group-members{ display:flex; flex-wrap:wrap; gap:14px; max-width:520px; }
+  .member-chip{ border:2px solid var(--border); border-radius:20px; padding:10px 24px; font-size:1.9rem; font-weight:700; background:var(--desk-empty); }
   .member-chip.girl{ color:var(--girl); border-color:color-mix(in srgb, var(--girl) 55%, var(--border)); background:var(--girl-soft); }
   .member-chip.boy{ color:var(--boy); border-color:color-mix(in srgb, var(--boy) 55%, var(--border)); background:var(--boy-soft); }
 
@@ -655,7 +656,10 @@
     }
 
     var wrap = el("div", {class:"groups-wrap"});
-    groupNumbers.forEach(function(g){
+    var PER_ROW = 3; // 1,2,3모둠 = 윗줄, 4,5모둠 = 아랫줄
+    var rowEl = null;
+    groupNumbers.forEach(function(g, gi){
+      if(gi % PER_ROW === 0){ rowEl = el("div", {class:"groups-row"}); wrap.appendChild(rowEl); }
       var card = el("div", {class:"group-card"});
       card.style.setProperty("--group-color", groupColor(g));
       var membersEl = el("div", {class:"group-members"});
@@ -664,7 +668,7 @@
       });
       card.appendChild(el("div", {class:"group-title", text:g+"모둠"}));
       card.appendChild(membersEl);
-      wrap.appendChild(card);
+      rowEl.appendChild(card);
     });
     return wrap;
   }
